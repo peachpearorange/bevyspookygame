@@ -53,14 +53,6 @@ use {avian3d::prelude::*,
      std::f32::consts::PI};
 // ui::UIData
 
-comment! {
-  // Voxel Scenes
-  pub static FLASHLIGHT: MyAsset<Scene> =
-    MyAsset::path_with_label("flashlight.vox", "flashlight");
-  pub static FLOWER: MyAsset<Scene> = MyAsset::path("flower.vox");
-  pub static GLOW_TEST: MyAsset<Scene> = MyAsset::path("glowtest.vox");
-}
-
 pub const GLOWY_COLOR: Color = Color::srgb(13.99, 11.32, 50.0);
 pub const GLOWY_COLOR_2: Color = Color::srgb(30.0, 20.7, 10.5);
 pub const GLOWY_COLOR_3: Color = Color::srgb(0.0, 30.0, 0.0);
@@ -78,6 +70,10 @@ pub enum MySprite {
   WhiteCorners,
   #[assoc(path = "note.png")]
   Note,
+  #[assoc(path = "treemonster.png")]
+  TreeMonster,
+  #[assoc(path = "tent.png")]
+  Tent,
   #[assoc(path = "player.png")]
   Player,
   #[assoc(path = "spaceman.png")]
@@ -402,118 +398,6 @@ pub fn set_visuals(mut visuals_q: Query<(Entity, &mut Visuals)>,
 // }
 #[derive(Component, Clone)]
 pub struct VisualSprite;
-// pub fn visuals(camq: Query<&GlobalTransform, With<Camera3d>>,
-//                serv: Res<AssetServer>,
-//                mut c: Commands,
-//                mut n: Local<u32>,
-//                mut visuals_q: Query<(Entity, Ref<Visuals>)>,
-//                mut visuals_sprites_q: Query<(&mut Transform, &GlobalTransform),
-//                      With<VisualSprite>>,
-//                mut option_target_overlay_entity: Local<Option<Entity>>,
-//                mut sprite_handles: Local<HashMap<MySprite, Handle<Image>>>,
-//                mut mesh_handles: Local<HashMap<GenMesh, Handle<Mesh>>>,
-//                mut material_handles: Local<HashMap<MyMaterial, Handle<StandardMaterial>>>,
-//                mut visual_child_entities: Local<EntityHashMap<Entity>>,
-//                mut multi_visual_child_entities: Local<EntityHashMap<Entity>>) {
-//   let mut get_material_handle = |material: MyMaterial| {
-//     material_handles.entry(material)
-//                     .or_insert_with(|| serv.add(material.val()))
-//                     .clone()
-//   };
-//   let mut get_mesh_handle = |mesh: GenMesh| {
-//     mesh_handles.entry(mesh)
-//                 .or_insert_with(|| serv.add(mesh.gen()))
-//                 .clone()
-//   };
-//   let mut get_sprite_handle = |sprite: MySprite| {
-//     sprite_handles.entry(sprite)
-//                   .or_insert_with(|| serv.load(format!("embedded://{}", sprite.path())))
-//                   .clone()
-//   };
-
-//   let text_style = TextStyle { font_size: 30.0,
-//                                ..default() };
-//   let invisible_material = get_material_handle(MyMaterial::InvisibleMaterial);
-//   let invisible_highlight =
-//     Highlight { hovered: Some(HighlightKind::Fixed(invisible_material.clone())),
-//                 pressed: Some(HighlightKind::Fixed(invisible_material.clone())),
-//                 selected: Some(HighlightKind::Fixed(invisible_material.clone())) };
-
-//   for (e, visuals) in &visuals_q {
-//     if visuals.is_changed() {
-//       *n += 1;
-//       // println(*n);
-//       if *n % 100 == 0 {
-//         println(*n);
-//       }
-//       let main_visual_child =
-//         *(visual_child_entities.entry(e).or_insert_with(|| {
-//                                           c.spawn((PickableBundle::default(),
-//                                                    invisible_highlight.clone(),
-//                      PbrBundle { material: invisible_material.clone() ,
-//                                  mesh: get_mesh_handle(GenMesh::Sphere),
-//                                  ..default() }))
-//              .set_parent(e)
-//              .id()
-//                                         }));
-//       c.entity(main_visual_child).despawn_descendants();
-//       if let Some(text) = visuals.text.clone() {
-//         c.spawn(BillboardTextBundle { text: Text::from_section(text, text_style.clone()),
-//                                       text_bounds: default(),
-//                                       text_anchor: default(),
-//                                       transform: Transform::from_xyz(0.0, 1.5, 0.0).with_scale(Vec3::splat(0.07)),
-//                                       billboard_depth: BillboardDepth(true),
-//                                       ..default() })
-//          .set_parent(main_visual_child);
-//       }
-//       if let Some(sprite) = visuals.sprite {
-//         let sprite_handle = get_sprite_handle(sprite);
-//         let billboard_mesh_handle = get_mesh_handle(GenMesh::BillboardMeshSquare);
-//         c.spawn((VisualSprite,
-//                  BillboardLockAxis { y_axis: true,
-//                                      rotation: true },
-//                  BillboardTextureBundle { mesh:
-//                                             BillboardMeshHandle(billboard_mesh_handle),
-//                                           texture:
-//                                             BillboardTextureHandle(sprite_handle),
-//                                           billboard_depth: BillboardDepth(true),
-//                                           ..default() }))
-//          .set_parent(main_visual_child);
-//       }
-//       if visuals.targeted {
-//         let target_overlay = get_sprite_handle(MySprite::WhiteCorners);
-//         let billboard_mesh_handle = get_mesh_handle(GenMesh::BillboardMeshSquare);
-//         c.spawn((BillboardLockAxis { y_axis: false,
-//                                      rotation: false },
-//                  BillboardTextureBundle { mesh:
-//                                             BillboardMeshHandle(billboard_mesh_handle),
-//                                           texture:
-//                                             BillboardTextureHandle(target_overlay),
-//                                           billboard_depth: BillboardDepth(false),
-//                                           transform:
-//                                             Transform::from_scale(Vec3::splat(1.7)),
-//                                           ..default() }))
-//          .set_parent(main_visual_child);
-//       }
-//       if let Some((material, gen_mesh)) = visuals.material_mesh {
-//         let material = get_material_handle(material);
-//         let mesh = get_mesh_handle(gen_mesh);
-//         c.spawn(PbrBundle { material,
-//                             mesh,
-//                             ..default() })
-//          .set_parent(main_visual_child);
-//       }
-//     }
-//   }
-//   if let Ok(cam_globaltransform) = camq.get_single() {
-//     for (mut transform, globaltransform) in &mut visuals_sprites_q {
-//       let dir = (cam_globaltransform.translation()
-//                  - globaltransform.translation()
-//                  ).normalize_or(Vec3::Y).with_y(0.0);
-//       transform.look_to(dir, Vec3::Y);
-//     }
-//   }
-// }
 
 pub fn visuals(camq: Query<&GlobalTransform, With<Camera3d>>,
                serv: Res<AssetServer>,
@@ -664,7 +548,7 @@ fn player_light_system(mut c: Commands,
       } else {
         println("bbbbbb");
         c.spawn((PlayerLight,
-                 PointLightBundle { point_light: PLAYER_LIGHT,
+                 PointLightBundle { point_light: PLAYER_LIGHT_AMBIENT,
                                     ..default() }))
          .set_parent(player_entity);
       }
@@ -1047,62 +931,6 @@ fn navigation(mut navigators_q: Query<(&Navigation,
         }
       };
     velocity.0 = linvelnew;
-    // LinearVelocity
-    // let current_velocity = Vec2::new(velocity.x, velocity.z);
-    // let speed = current_velocity.length();
-
-    // let desired_direction = match nav.navigation_kind {
-    //   NavigationKind::None => Vec2::ZERO,
-    //   NavigationKind::Vec2(vec) => vec.normalize_or_zero(),
-    //   NavigationKind::Pos(pos) => {
-    //     let current_pos = Vec2::new(transform.translation.x, transform.translation.z);
-    //     (pos - current_pos).normalize_or_zero()
-    //   }
-    //   NavigationKind::Chase(entity) => {
-    //     if let Ok(target_transform) = chase_targets_q.get(entity) {
-    //       let target_pos = target_transform.translation();
-    //       let current_pos = transform.translation;
-    //       Vec2::new(target_pos.x - current_pos.x, target_pos.z - current_pos.z).normalize_or_zero()
-    //     } else {
-    //       Vec2::ZERO
-    //     }
-    //   }
-    //   NavigationKind::ChaseAtRange(entity, range) => {
-    //     if let Ok(target_transform) = chase_targets_q.get(entity) {
-    //       let target_pos = target_transform.translation();
-    //       let current_pos = transform.translation;
-    //       let rel = Vec2::new(target_pos.x - current_pos.x, target_pos.z - current_pos.z);
-    //       let distance = rel.length();
-    //       let direction = if distance < range { -1.0 } else { 1.0 };
-    //       rel.normalize_or_zero() * direction
-    //     } else {
-    //       Vec2::ZERO
-    //     }
-    //   }
-    // };
-
-    // let max_force = 40.0 * nav.max_speed; // Scale max force with max speed
-    // let min_force = 0.5 * nav.max_speed; // Minimum force to apply
-
-    // let target_velocity = desired_direction * nav.max_speed;
-    // let velocity_difference = target_velocity - current_velocity;
-
-    // let force_magnitude = if desired_direction != Vec2::ZERO {
-    //   // Accelerating
-    //   velocity_difference.length().clamp(min_force, max_force)
-    // } else {
-    //   // Decelerating
-    //   (-current_velocity).length().clamp(min_force, max_force)
-    // };
-
-    // let force_direction = if desired_direction != Vec2::ZERO {
-    //   velocity_difference.normalize_or_zero()
-    // } else {
-    //   -current_velocity.normalize_or_zero()
-    // };
-
-    // let scaled_force = force_direction * force_magnitude * 20.0;
-    // force.set_force(Vec3::new(scaled_force.x, 0.0, scaled_force.y));
   }
 }
 
@@ -1357,107 +1185,7 @@ comment! {
 pub fn string(t: impl ToString) -> String { t.to_string() }
 #[derive(Component, Clone, Default)]
 struct CanBeFollowedByNPC;
-// #[derive(Component, Clone, Default, new)]
-// fn npc_movement(mut npc_q: Query<(&mut NPC, &mut Navigation, &GlobalTransform)>,
-//                 follow_target_q: Query<(Entity, &GlobalTransform),
-//                       With<CanBeFollowedByNPC>>) {
-//   let get_target_pos = |e| {
-//     follow_target_q.get(e)
-//                    .ok()
-//                    .map(|(_, globaltransform)| globaltransform.translation())
-//   };
-//   for (mut npc, mut npc_navigation, npc_globaltransform) in &mut npc_q {
-//     let npc_pos = npc_globaltransform.translation();
-//     // let pos_in_range = |pos: Vec3| {
-//     //   let dist = pos.distance(npc_pos);
-//     //   dist > NPC_FOLLOW_RANGE_MIN && dist < NPC_FOLLOW_RANGE_MAX
-//     // };
-//     let in_range = |e: Entity| {
-//       get_target_pos(e).map_or(false, |pos: Vec3| {
-//                          let dist = pos.distance(npc_pos);
-//                          dist > NPC_FOLLOW_RANGE_MIN && dist < NPC_FOLLOW_RANGE_MAX
-//                        })
-//     };
-//     if let Some(target_entity) = npc.follow_target
-//        && in_range(target_entity)
-//     {
-//       npc_navigation.navigation_kind = NavigationKind::ChaseAtRange(target_entity, 4.0);
-//     } else {
-//       npc.follow_target =
-//         pick(filter_map(|(e, _)| in_range(e).then_some(e), &follow_target_q));
-//     }
-//   }
-// }
-// #[derive(Component)]
-// pub struct Billboard {
-//   pub transform: Transform,
-//   pub image_handle: Handle<Image>,
-//   pub unlit: bool
-// }
-// pub fn gib_billboard(mut sprite_3d_params: bevy_sprite3d::Sprite3dParams,
-//                      mut c: Commands,
-//                      q: Query<(Entity, &Billboard)>) {
-//   for (e,
-//        Billboard { transform,
-//                    image_handle,
-//                    unlit }) in &q
-//   {
-//     if let Some(image) = sprite_3d_params.images.get(image_handle.clone()) {
-//       c.entity(e)
-//        .remove::<Billboard>()
-//        .insert(bevy_sprite3d::Sprite3d { image: image_handle.clone(),
-//                                          transform: *transform,
-//                                          pixels_per_metre: image.height() as f32,
-//                                          double_sided: true,
-//                                          unlit: false,
-//                                          ..default() }.bundle(&mut sprite_3d_params));
-//     }
-//   }
-// }
-// #[derive(Component)]
-// pub struct AnimatedBillboard {
-//   pub transform: Transform,
-//   pub image_handle: Handle<Image>,
-//   pub unlit: bool,
-//   pub num_frames: usize
-// }
-// pub fn gib_animated_billboard(mut sprite_3d_params: Sprite3dParams,
-//                               mut c: Commands,
-//                               q: Query<(Entity, &AnimatedBillboard)>) {
-//   for (e, animated_billboard) in &q {
-//     let image_handle = animated_billboard.image_handle.clone();
-//     if let Some(image) = sprite_3d_params.images.get(&image_handle) {
-//       let &AnimatedBillboard { transform,
-//                                unlit,
-//                                num_frames,
-//                                .. } = animated_billboard;
-//       let image_width = image.width() as f32;
-//       let image_height = image.height() as f32;
-//       let frame_width = image_width / (num_frames as f32);
-//       let texture_atlas_layout_handle =
-//         sprite_3d_params.atlas_layouts
-//                         .add(TextureAtlasLayout::from_grid(vec2(frame_width, image_height),
-//                                                            num_frames,
-//                                                            1,
-//                                                            None,
-//                                                            None));
-//       let texture_atlas = TextureAtlas { layout: texture_atlas_layout_handle,
-//                                          index: 0 };
-//       c.entity(e)
-//        .remove::<AnimatedBillboard>()
-//        .insert(Sprite3d { image: image_handle,
-//                           transform,
-//                           // alpha_mode: AlphaMode::Blend,
-//                           pixels_per_metre: image_height,
-//                           double_sided: true,
-//                           unlit,
-//                           ..default() }.bundle_with_atlas(&mut sprite_3d_params,
-//                                                           texture_atlas));
-//     }
-//   }
-// }
 
-const ENEMY_SEE_PLAYER_RANGE: f32 = 100.0;
 pub const AMBIENT_LIGHT: AmbientLight = AmbientLight { color: Color::WHITE,
                                                        brightness: 100.0 };
 pub const BLOOM_SETTINGS: BloomSettings =
@@ -1474,7 +1202,14 @@ const FOG_SETTINGS: FogSettings =
                                               end: 20.0 },
                 directional_light_color: Color::NONE,
                 directional_light_exponent: 8.0 };
-const PLAYER_LIGHT: PointLight =
+
+const PLAYER_LIGHT_FLASHLIGHT: DirectionalLight = DirectionalLight { color:   Color::WHITE,
+                                                                     illuminance:  1_000_000.0,
+                                                                     shadows_enabled: true,
+                                                                     shadow_depth_bias: DirectionalLight::DEFAULT_SHADOW_DEPTH_BIAS,
+                                                                     shadow_normal_bias: DirectionalLight::DEFAULT_SHADOW_NORMAL_BIAS,
+};
+const PLAYER_LIGHT_AMBIENT: PointLight =
   PointLight { color: Color::WHITE,
                intensity: 1_000_000.0,
                radius: 10.0,
@@ -1482,6 +1217,10 @@ const PLAYER_LIGHT: PointLight =
                shadows_enabled: true,
                shadow_depth_bias: PointLight::DEFAULT_SHADOW_DEPTH_BIAS,
                shadow_normal_bias: PointLight::DEFAULT_SHADOW_NORMAL_BIAS };
+const ENEMY_SEE_PLAYER_RANGE: f32 = 100.0;
+const PLAYER_MAX_SPEED: f32 = 8.0;
+const MONSTER_MAX_SPEED: f32 = 8.0;
+const TILE_SIZE: f32 = 1.0;
 const PLAYER_INTERACTION_RANGE: f32 = 3.0;
 const GHOST_CATCH_RANGE: f32 = 1.0;
 const GHOST_SEE_DARK_RANGE: f32 = 10.0;
@@ -1571,7 +1310,6 @@ struct WanderState {
 #[derive(Resource)]
 struct TreeRegistry(Vec<Entity>);
 
-
 const CHARACTER_HEIGHT: f32 = 2.0;
 const CHARACTER_RADIUS: f32 = 1.0;
 #[derive(Bundle, Clone)]
@@ -1639,20 +1377,28 @@ fn random_normalized_vector() -> Vec3 { random::<Quat>() * Vec3::X }
 fn prob(p: f32) -> bool { p > rand::random::<f32>() }
 
 use bevy_mesh_terrain::{terrain_config::TerrainConfig, TerrainMeshPlugin};
+const NOTES:&[&'static str] = &[
+  "Diary entry 1: me and my friends are camping in this forest. I heard some strange sounds. could be a bear. yikes.",
+  "Diary entry 2: cant find my friend.",
+  "Diary entry 3: been looking for him. hear more strange sounds",
+  "Diary entry 4: i swear i saw a tree wink at me",
+  "Diary entry 5: oh my god the trees are chasing me!",
+  "Diary entry 6: they got me. I'm turning into a tree. it's over",
+];
 #[derive(Component)]
-struct Ghost;
+struct Monster;
 const WORLD_MAP: &[&'static str] = &["wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww",
                                      "w   n       t      t                          w",
                                      "w                                n            w",
                                      "w      t       t         t                t   w",
                                      "w                                             w",
                                      "w     g     t    n             g              w",
-                                     "w                           t       t         w",
+                                     "w                   T    T  t       t         w",
                                      "w      t                                      w",
-                                     "w                                             w",
+                                     "w                 T   n     T                 w",
                                      "w   n          t         t              n     w",
                                      "w                                             w",
-                                     "w        t         t           g              w",
+                                     "w        t         t  T        g              w",
                                      "w t                                   t       w",
                                      "w        t     n     t      t                 w",
                                      "w                                             w",
@@ -1670,16 +1416,30 @@ fn note(translation: Vec3) -> impl Bundle {
                    ..default() })
 }
 fn ghost(pos: Vec3) -> impl Bundle {
-  (Ghost,
+  (Monster,
    name("ghost"),
    Navigation::new(PLAYER_MAX_SPEED),
    CharacterBundle::new(pos, true, Visuals::sprite(MySprite::SpaceWizard)))
 }
+fn monster(pos: Vec3) -> impl Bundle {
+  (Monster,
+   name("monster"),
+   Navigation::new(PLAYER_MAX_SPEED),
+   CharacterBundle::new(pos, true, Visuals::sprite(MySprite::SpaceWizard)))
+}
+fn treemonster(pos: Vec3) -> impl Bundle {
+  (Monster,
+   name("tree monster"),
+   Navigation::new(MONSTER_MAX_SPEED),
+   CharacterBundle::new(pos, true, Visuals::sprite(MySprite::TreeMonster)))
+}
 fn tree(pos: Vec3) -> impl Bundle {
   (name("ghost"), CharacterBundle::new(pos, false, Visuals::sprite(MySprite::Tree)))
 }
+fn tent(pos: Vec3) -> impl Bundle {
+  (name("tent"), CharacterBundle::new(pos, false, Visuals::sprite(MySprite::Tent)))
+}
 fn wall(pos: Vec3) -> impl Bundle {}
-const PLAYER_MAX_SPEED: f32 = 20.0;
 
 fn player(translation: Vec3) -> impl Bundle {
   (Player::default(),
@@ -1688,7 +1448,6 @@ fn player(translation: Vec3) -> impl Bundle {
    CharacterBundle::new(translation, true, Visuals::sprite(MySprite::Player)))
 }
 
-const TILE_SIZE: f32 = 1.0;
 pub fn setup(playerq: Query<&Transform, With<Player>>,
              serv: Res<AssetServer>,
              mut meshes: ResMut<Assets<Mesh>>,
@@ -1706,6 +1465,9 @@ pub fn setup(playerq: Query<&Transform, With<Player>>,
         }
         't' => {
           c.spawn(tree(pos));
+        }
+        'T' => {
+          c.spawn(tent(pos));
         }
         'n' => {
           c.spawn(note(pos));
