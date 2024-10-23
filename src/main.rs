@@ -68,6 +68,8 @@ pub const ENABLE_SHADOWS_OTHER_THAN_SUN: bool = false;
 pub enum MySprite {
   #[assoc(path = "white_corners.png")]
   WhiteCorners,
+  #[assoc(path = "car.png")]
+  Car,
   #[assoc(path = "note.png")]
   Note,
   #[assoc(path = "treemonster.png")]
@@ -704,11 +706,15 @@ fn navigation(mut navigators_q: Query<(&Navigation,
   }
 }
 
-fn monster_movement(mut monsterq: Query<(&mut Navigation, &Monster, &Transform)>,
+#[derive(Component)]
+struct Monster {
+  is_dormant: bool
+}
+fn monster_movement(mut monsterq: Query<(&mut Navigation, &mut Monster, &Transform)>,
                     playerq: Query<(Entity, &Player, &Transform)>,
                     time: Res<TimeTicks>) {
   if let Ok((player_entity, player, player_transform)) = playerq.get_single() {
-    for (mut monsternav, monster, monster_transform) in &mut monsterq {
+    for (mut monsternav, mut monster, monster_transform) in &mut monsterq {
       let dist = player_transform.translation
                                  .distance(monster_transform.translation);
 
@@ -717,11 +723,14 @@ fn monster_movement(mut monsterq: Query<(&mut Navigation, &Monster, &Transform)>
       {
         *monsternav = Navigation { max_speed: MONSTER_MAX_SPEED_CHASE,
                                    navigation_kind: NavigationKind::Chase(player_entity) };
+        monster.is_dormant = false;
       } else {
-        if time.0 % 600 == 0 {
-          let dir = random::<Dir2>().as_vec2().normalize_or_zero();
-          *monsternav = Navigation { max_speed: MONSTER_MAX_SPEED,
-                                     navigation_kind: NavigationKind::Vec2(dir) };
+        if !monster.is_dormant {
+          if time.0 % 600 == 0 {
+            let dir = random::<Dir2>().as_vec2().normalize_or_zero();
+            *monsternav = Navigation { max_speed: MONSTER_MAX_SPEED,
+                                       navigation_kind: NavigationKind::Vec2(dir) };
+          }
         }
       }
     }
@@ -802,16 +811,19 @@ pub struct UIData {
   pub infobox_data: Vec<String>
 }
 
-const UI_BACKGROUND_COLOR: Color = Color::srgba(0.0, 0.0, 0.0, 0.5);
-const UI_BORDER_COLOR: Color = Color::srgba(0.0, 0.0, 0.0, 0.7);
+const UI_BACKGROUND_COLOR: Color = Color::srgba(0.9, 0.9, 0.7, 1.0);
+const UI_BORDER_COLOR: Color = Color::srgba(0.8, 0.8, 0.7, 1.0);
+const UI_FONT_COLOR: Color = Color::srgba(0.3, 0.3, 0.3, 1.0);
 pub fn common_style(sb: &mut StyleBuilder) {
   sb.font_size(32.0)
     .display(Display::Block)
-    .border(1)
+    .border(3)
     .border_color(UI_BORDER_COLOR)
     .background_color(UI_BACKGROUND_COLOR)
     .position(bevy::ui::PositionType::Absolute)
-    .padding(3)
+    .color(UI_FONT_COLOR)
+    // .margin(5)
+    // .padding(3)
     .pointer_events(false);
 }
 #[derive(Clone, PartialEq)]
@@ -922,7 +934,7 @@ const TORCH_LIGHT: PointLight =
   PointLight { color: Color::hsv(33.0, 1.0, 0.5),
                intensity: 60_000.0,
                radius: 0.0,
-               range: 3.8,
+               range: 5.0,
                shadows_enabled: true,
                shadow_depth_bias: PointLight::DEFAULT_SHADOW_DEPTH_BIAS / 10.0,
                shadow_normal_bias: PointLight::DEFAULT_SHADOW_NORMAL_BIAS / 10.0 };
@@ -947,7 +959,7 @@ struct Proximal {
   distance: f32
 }
 #[derive(Component)]
-struct Note;
+struct Note(&'static str);
 #[derive(Component, Clone, Debug, Default)]
 pub struct Player {
   notes_found: usize,
@@ -962,12 +974,14 @@ fn proximity_system(mut c: Commands,
                           Without<Player>>,
                     monsterq: Query<(Entity, &Monster)>,
                     noteq: Query<(Entity, &Note)>,
+                    mut uidata: ResMut<UIData>,
                     flashlightq: Query<Entity, With<PlayerFlashlight>>,
                     playerambientlightq: Query<Entity, With<PlayerAmbientlight>>,
                     mut prev_proximal_entities: Local<HashSet<Entity>>) {
   if let Ok((player_entity, mut player, player_transform, mut player_lockedaxes)) =
     player_query.get_single_mut()
   {
+    // uidata.note = default();
     let player_pos = player_transform.translation;
     let current_proximal_entities: HashSet<Entity> =
       filter_map(|(e, &Transform { translation, .. }, &Proximal { distance })| {
@@ -978,7 +992,17 @@ fn proximity_system(mut c: Commands,
       HashSet::difference(&current_proximal_entities, &prev_proximal_entities);
     let is_note = |e| noteq.get(e).is_ok();
     let is_monster = |e| monsterq.get(e).is_ok();
-    for &e in &prev_proximal_entities {}
+    uidata.note = find_map(|&e| {
+                             noteq.get(e)
+                                  .map(|(_, &Note(text))| vec![text.to_string()])
+                                  .ok()
+                           },
+                           &current_proximal_entities).unwrap_or_default();
+    // for &e in &prev_proximal_entities {
+    //   if let Ok() = noteq.get(e) {
+    //     uidata.note = ;
+    //   }
+    // }
     for &e in new_proximal_entities {
       println("new proximal entity");
       if is_monster(e) {
@@ -998,7 +1022,7 @@ fn proximity_system(mut c: Commands,
       if is_note(e) {
         // found note
         println("found note");
-        let note = NOTES[player.notes_found];
+        // let note = NOTES[player.notes_found];
         player.notes_found += 1;
       }
     }
@@ -1008,7 +1032,7 @@ fn proximity_system(mut c: Commands,
 
 const TILE_SIZE: f32 = 1.0;
 const CHARACTER_HEIGHT: f32 = TILE_SIZE;
-const CHARACTER_RADIUS: f32 = CHARACTER_HEIGHT * 0.5;
+const CHARACTER_RADIUS: f32 = CHARACTER_HEIGHT * 0.3;
 #[derive(Bundle, Clone)]
 pub struct CharacterBundle((Visuals,
                              FaceCamera,
@@ -1077,73 +1101,90 @@ fn prob(p: f32) -> bool { p > rand::random::<f32>() }
 
 use bevy_mesh_terrain::{terrain_config::TerrainConfig, TerrainMeshPlugin};
 const NOTES:&[&'static str] = &[
-  "Diary entry 1: me and my friends are camping in this forest. I heard some strange sounds. could be a bear. yikes.",
-  "Diary entry 2: cant find my friend.",
-  "Diary entry 3: been looking for him. hear more strange sounds",
-  "Diary entry 4: i swear i saw a tree wink at me",
-  "Diary entry 5: oh my god the trees are chasing me!",
-  "Diary entry 6: they got me. I'm turning into a tree. it's over",
+  "Diary entry 1\n me and my friends are camping in this forest.\n I heard some strange sounds. could be a bear.\n yikes.",
+  "Diary entry 2\n cant find my friend.",
+  "Diary entry 3\n been looking for him. hear more strange sounds",
+  "Diary entry 4\n i swear i saw a tree wink at me",
+  "Diary entry 5\n oh my god the trees are chasing me!",
+  "Diary entry 6\n they got me. I'm turning into a tree. it's over",
+  "Diary entry 7\n",
+  "Diary entry 8\n",
+  "Diary entry 9\n",
+  "Diary entry 10\n",
+  "Diary entry 11\n",
+  "Diary entry 12\n",
+  "Diary entry 13\n",
+  "Diary entry 14\n",
+  "Diary entry 15\n",
+  "Diary entry 16\n",
+  "Diary entry 17\n",
+  "Diary entry 18\n",
+  "Diary entry 19\n",
 ];
-#[derive(Component)]
-struct Monster;
-const WORLD_MAP: &[&'static str] = &["wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww",
-                                     "w   n       t      t                          w",
-                                     "w                                n            w",
-                                     "w      t  l    t         t                t   w",
-                                     "w                                             w",
-                                     "w     g     t    n             g              w",
-                                     "w                   T    T  t       t         w",
-                                     "w      t                                      w",
-                                     "w                 T   n     T                 w",
-                                     "w   n          t         t              n     w",
-                                     "w                                             w",
-                                     "w        t         t  T        g              w",
-                                     "w t                                   t       w",
-                                     "w t                                   t       w",
-                                     "w t                                   t       w",
-                                     "w t                                   t       w",
-                                     "w        t     n     t      t                 w",
-                                     "w                                             w",
-                                     "w t    t                         n      p     w",
-                                     "w                                             w",
-                                     "w                                             w",
-                                     "w                                             w",
-                                     "w                                             w",
-                                     "w                                             w",
-                                     "w                                             w",
-                                     "w                                             w",
-                                     "w                                             w",
-                                     "w                                         l   w",
-                                     "w                                             w",
-                                     "w                                             w",
-                                     "w                                             w",
-                                     "w                                             w",
-                                     "w                                             w",
-                                     "w                                             w",
-                                     "w                                             w",
-                                     "w      t        t       t            t        w",
-                                     "w        t     n     t      t                 w",
-                                     "w                                             w",
-                                     "w t    t    l                    n            w",
-                                     "w                                             w",
-                                     "w      t        t       t            t        w",
-                                     "w        t     n     t      t                 w",
-                                     "w                                             w",
-                                     "w t    t                         n            w",
-                                     "w                                             w",
-                                     "w      t        t       t            t        w",
-                                     "w        t     n     t      t                 w",
-                                     "w                                             w",
-                                     "w t    t                         n            w",
-                                     "w                                             w",
-                                     "w      t        t       t            t        w",
-                                     "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww"];
-const NOTE_FIND_RANGE: f32 = 0.8;
-fn note(translation: Vec3) -> impl Bundle {
+const WORLD_MAP: &[&'static str] =
+  &["wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww",
+    "w         g g                        n       t      t                          w",
+    "w         t t                                                     n            w",
+    "w     wwwww wwwwwwww                    t  l    t         t                t   w",
+    "w     wt  tlt  tw                                                              w",
+    "w     w    n    w                      g     t    n             g              w",
+    "w     w         w                                    T    T  t       t         w",
+    "w     w  w   w  w                       t                                      w",
+    "w     wttw   wttw                                  T   n     T                 w",
+    "w     wwww   wwww                    n          t         t              n     w",
+    "w                                                                              w",
+    "w                                         t         t  T        g              w",
+    "w                                  t                                   t       w",
+    "w                                  t                                   t       w",
+    "w   l                              t                                   t       w",
+    "w                                  t                                   t       w",
+    "w                                         t     n     t      t                 w",
+    "w                                                                              w",
+    "w                                  t    t                         n            w",
+    "w                                                                              w",
+    "w                                                                              w",
+    "w                   l                   l                     l                w",
+    "w                                                                              w",
+    "w                                                                              w",
+    "w                                                                              w",
+    "w   l                                                                          w",
+    "w                                                                              w",
+    "w                                                                          l   w",
+    "w                                                                              w",
+    "w                                                                              w",
+    "w                                                                              w",
+    "w  tt wwwwwwwwwwwww                                                            w",
+    "w          t      t                                                            w",
+    "w                                                                              w",
+    "w                 t                                                            w",
+    "w   l                                   t        t       t            t        w",
+    "w                  w                      t     n     t      t                 w",
+    "w   t      t   t   w                                                           w",
+    "w                  w               t    t    l                    n            w",
+    "w   www           tw                                                           w",
+    "w   www    t       w                    t        t       t            t        w",
+    "w   www            w                      t     n     t      t                 w",
+    "w   l      t      t                                                            w",
+    "w       wwwwwwwwwwwwwww            t    t                         n            w",
+    "w   ttt               w                                                        w",
+    "w          ttt        w                 t        t       t            t        w",
+    "wwwwwww p w           w                   t     n     t      t                 w",
+    "wwwwwww   w t  t tt   w                                                        w",
+    "wwwwwww c w  l        w            t    t                         n            w",
+    "wwwwwww   w n     l   w                                                        w",
+    "w         w  tt   t t w                 t        t       t            t        w",
+    "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww"];
+const NOTE_FIND_RANGE: f32 = 1.8;
+fn note(translation: Vec3, note_data: &'static str) -> impl Bundle {
   (Visuals::sprite(MySprite::Note),
+   Note(note_data),
    Proximal { distance: NOTE_FIND_RANGE },
    SpatialBundle { transform: Transform { translation,
-                                          ..default() },
+                                          rotation:
+                                            (Quat::from_rotation_y(avian3d::math::PI * 0.2)
+                                             * Quat::from_rotation_x(avian3d::math::PI
+                                                                     * 0.5)).into(),
+                                          scale: Vec3::splat(0.5) },
                    ..default() })
 }
 fn torch(pos: Vec3) -> impl Bundle {
@@ -1154,20 +1195,20 @@ fn torch(pos: Vec3) -> impl Bundle {
                       ..default() })
 }
 fn ghost(pos: Vec3) -> impl Bundle {
-  (Monster,
+  (Monster { is_dormant: true },
    name("ghost"),
    Navigation::new(PLAYER_MAX_SPEED),
    CharacterBundle::new(pos, true, Visuals::sprite(MySprite::SpaceWizard)))
 }
 fn monster(pos: Vec3) -> impl Bundle {
-  (Monster,
+  (Monster { is_dormant: true },
    Proximal { distance: MONSTER_CATCH_RANGE },
    name("monster"),
    Navigation::new(MONSTER_MAX_SPEED),
    CharacterBundle::new(pos, true, Visuals::sprite(MySprite::SpaceWizard)))
 }
 fn treemonster(pos: Vec3) -> impl Bundle {
-  (Monster,
+  (Monster { is_dormant: true },
    name("tree monster"),
    Proximal { distance: MONSTER_CATCH_RANGE },
    Navigation::new(MONSTER_MAX_SPEED),
@@ -1177,7 +1218,19 @@ fn tree(pos: Vec3) -> impl Bundle {
   (name("ghost"), CharacterBundle::new(pos, false, Visuals::sprite(MySprite::Tree)))
 }
 fn tent(pos: Vec3) -> impl Bundle {
-  (name("tent"), CharacterBundle::new(pos, false, Visuals::sprite(MySprite::Tent)))
+  (name("tent"),
+   Note("It's a tent"),
+   Proximal { distance: NOTE_FIND_RANGE },
+   CharacterBundle::new(pos, false, Visuals::sprite(MySprite::Tent)))
+}
+fn car(pos: Vec3) -> impl Bundle {
+  (Visuals::unlit_sprite(MySprite::Car),
+   Note("You thought it'd be fun to drive through this forest but your car ran out of gas"),
+   Proximal { distance: NOTE_FIND_RANGE },
+   FaceCamera,
+   PointLightBundle { transform: Transform::from_translation(pos),
+                      point_light: TORCH_LIGHT,
+                      ..default() })
 }
 fn wall(pos: Vec3) -> impl Bundle {}
 
@@ -1188,6 +1241,10 @@ fn player(translation: Vec3) -> impl Bundle {
    CharacterBundle::new(translation, true, Visuals::sprite(MySprite::Player)))
 }
 
+fn reset(mut world:&mut World){
+  world.clear_entities()
+
+}
 pub fn setup(playerq: Query<&Transform, With<Player>>,
              serv: Res<AssetServer>,
              mut meshes: ResMut<Assets<Mesh>>,
@@ -1224,77 +1281,77 @@ pub fn setup(playerq: Query<&Transform, With<Player>>,
   //                      transform:
   //                        Transform::from_translation(position).with_scale(Vec3::splat(3.5)),
   //                      ..default() }));
-  for (y, row) in WORLD_MAP.iter().enumerate() {
-    for (x, tile) in row.chars().enumerate() {
-      let pos = Vec3::new(x as f32 * TILE_SIZE,
-                          CHARACTER_HEIGHT * 0.5,
-                          -(y as f32) * TILE_SIZE);
+  let mut num_notes_spawned = 0;
 
-      match tile {
-        'w' => {
-          c.spawn((RigidBody::Static,
-                   cube_collider.clone(),
-                   PbrBundle { mesh: cube_mesh_handle.clone(),
-                               material: ground_material.clone(),
-                               transform: Transform::from_translation(pos),
-                               ..default() }));
-        }
-        'l' => {
-          c.spawn(torch(pos));
-        }
-        't' => {
-          c.spawn(tree(pos));
-        }
-        'T' => {
-          c.spawn(tent(pos));
-        }
-        'n' => {
-          c.spawn(note(pos));
-        }
-        'g' => {
-          c.spawn(treemonster(pos));
-        }
-        'p' => {
-          let player_entity = c.spawn(player(pos)).id();
-          c.spawn((PlayerFlashlight,
-                   SpotLightBundle { spot_light: PLAYER_LIGHT_FLASHLIGHT,
+  for (x, y, tile) in enumerate(WORLD_MAP).flat_map(move |(y, line)| {
+                                            line.char_indices()
+                                                .map(move |(x, tile)| (x, y, tile))
+                                          })
+  {
+    let pos = Vec3::new(x as f32 * TILE_SIZE,
+                        CHARACTER_HEIGHT * 0.5,
+                        y as f32 * TILE_SIZE);
 
-                                     transform: Transform::from_xyz(0.0, 2.0, 2.3), // .with_rotation(Quat::from_rotation_z(4.0))
-                                     ..default() }))
-           .set_parent(player_entity);
-          // c.spawn((PlayerFlashlight,
-          //          PointLightBundle { point_light: PLAYER_LIGHT_AMBIENT,
-          //                             transform: Transform::from_xyz(0.0,
-          //                                                            1.7,
-          //                                                            num_ambient_lights
-          //                                                            as f32
-          //                                                            * 2.0
-          //                                                            + 0.3),
-          //                             ..default() }))
-          //  .set_parent(player_entity);
-          let mut num_ambient_lights = 0;
-          let mut spawn_ambient_light = || {
-            c.spawn((PlayerAmbientlight,
-                     PointLightBundle { point_light: PLAYER_LIGHT_AMBIENT,
-                                        transform: Transform::from_xyz(0.0,
-                                                                       1.7,
-                                                                       num_ambient_lights
-                                                                       as f32
-                                                                       * 2.0
-                                                                       + 0.3),
-                                        ..default() }))
-             .set_parent(player_entity);
-            num_ambient_lights += 1;
-          };
-
-          spawn_ambient_light();
-          spawn_ambient_light();
-          spawn_ambient_light();
-          spawn_ambient_light();
-          spawn_ambient_light();
-        }
-        _ => {}
+    match tile {
+      'w' => {
+        c.spawn((RigidBody::Static,
+                 cube_collider.clone(),
+                 PbrBundle { mesh: cube_mesh_handle.clone(),
+                             material: ground_material.clone(),
+                             transform: Transform::from_translation(pos),
+                             ..default() }));
       }
+      'l' => {
+        c.spawn(torch(pos));
+      }
+      'c' => {
+        c.spawn(car(pos));
+      }
+      't' => {
+        c.spawn(tree(pos));
+      }
+      'T' => {
+        c.spawn(tent(pos));
+      }
+      'n' => {
+        c.spawn(note(pos - Vec3::Y * 0.4,
+                     NOTES.get(num_notes_spawned).unwrap_or(&"unwritten note")));
+        num_notes_spawned += 1;
+      }
+      'g' => {
+        c.spawn(treemonster(pos));
+      }
+      'p' => {
+        let player_entity = c.spawn(player(pos)).id();
+        c.spawn((PlayerFlashlight,
+                 SpotLightBundle { spot_light: PLAYER_LIGHT_FLASHLIGHT,
+
+                                   transform: Transform::from_xyz(0.0, 2.0, 2.3),
+                                   visibility: Visibility::Hidden,
+                                   ..default() }))
+         .set_parent(player_entity);
+        let mut num_ambient_lights = 0;
+        let mut spawn_ambient_light = || {
+          c.spawn((PlayerAmbientlight,
+                   PointLightBundle { point_light: PLAYER_LIGHT_AMBIENT,
+                                      transform: Transform::from_xyz(0.0,
+                                                                     1.7,
+                                                                     num_ambient_lights
+                                                                     as f32
+                                                                     * 2.0
+                                                                     + 0.3),
+                                      ..default() }))
+           .set_parent(player_entity);
+          num_ambient_lights += 1;
+        };
+
+        spawn_ambient_light();
+        spawn_ambient_light();
+        spawn_ambient_light();
+        spawn_ambient_light();
+        spawn_ambient_light();
+      }
+      _ => {}
     }
   }
 
