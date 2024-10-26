@@ -28,25 +28,18 @@ use {avian3d::prelude::*,
             core_pipeline::{bloom::{BloomCompositeMode, BloomPrefilterSettings,
                                     BloomSettings},
                             Skybox},
-            ecs::{entity::EntityHashMap, world::Command},
-            math::{primitives, vec3, Vec3},
-            pbr::{StandardMaterial, VolumetricFogSettings},
+            math::{primitives, vec2, vec3, Vec3},
+            pbr::StandardMaterial,
             prelude::*,
             render::{render_resource::TextureViewDescriptor,
                      texture::{ImageAddressMode, ImageFilterMode, ImageSamplerDescriptor}},
-            utils::{EntityHashSet, HashMap, HashSet},
+            utils::{HashMap, HashSet},
             window::WindowMode},
      bevy_embedded_assets::*,
-     bevy_mod_billboard::{BillboardDepth, BillboardLockAxis, BillboardMeshHandle,
-                          BillboardTextBundle, BillboardTextureBundle,
-                          BillboardTextureHandle},
-     bevy_mod_picking::{prelude::{Highlight, HighlightKind},
-                        PickableBundle},
      bevy_panorbit_camera::PanOrbitCamera,
      bevy_quill::{prelude::*, QuillPlugin, ViewChild},
      bevy_quill_overlays::QuillOverlaysPlugin,
      dynamics::solver::SolverConfig,
-     enum_assoc::Assoc,
      fancy_constructor::new,
      rand::{random, thread_rng},
      rust_utils::*,
@@ -63,279 +56,214 @@ pub const BILLBOARD_REL_SCALE: f32 = 2.0;
 pub const TEXT_SCALE: f32 = 0.013;
 pub const ENABLE_SHADOWS_OTHER_THAN_SUN: bool = false;
 
-#[derive(Assoc, Copy, Clone, Hash, Eq, PartialEq)]
-#[func(pub const fn path(&self) -> &'static str)]
-pub enum MySprite {
-  #[assoc(path = "white_corners.png")]
-  WhiteCorners,
-  #[assoc(path = "car.png")]
-  Car,
-  #[assoc(path = "note.png")]
-  Note,
-  #[assoc(path = "treemonster.png")]
-  TreeMonster,
-  #[assoc(path = "tent.png")]
-  Tent,
-  #[assoc(path = "torch.png")]
-  Torch,
-  #[assoc(path = "player.png")]
-  Player,
-  #[assoc(path = "spaceman.png")]
-  SpaceMan,
-  #[assoc(path = "spacecowboy.png")]
-  SpaceCowBoy,
-  #[assoc(path = "spacewizard.png")]
-  SpaceWizard,
-  #[assoc(path = "wormhole.png")]
-  WormHole,
-  #[assoc(path = "gate.png")]
-  Gate,
-  #[assoc(path = "turret.png")]
-  Turret,
-  #[assoc(path = "crystal_monster.png")]
-  CrystalMonster,
-  #[assoc(path = "container.png")]
-  Container,
-  #[assoc(path = "mushroom_man.png")]
-  MushroomMan,
-  #[assoc(path = "asteroid.png")]
-  Asteroid,
-  #[assoc(path = "icesteroid.png")]
-  IceAsteroid,
-  #[assoc(path = "crystal_asteroid.png")]
-  CrystalAsteroid,
-  #[assoc(path = "coin.png")]
-  Coin,
-  #[assoc(path = "space_cat.png")]
-  SpaceCat,
-  #[assoc(path = "spherical_cow.png")]
-  SphericalCow,
-  #[assoc(path = "zorp.png")]
-  Zorp,
-  #[assoc(path = "space_station.png")]
-  SpaceStation,
-  #[assoc(path = "ice_planet.png")]
-  IcePlanet,
-  #[assoc(path = "lava_planet.png")]
-  LavaPlanet,
-  #[assoc(path = "pixelc/habitableplanet.png")]
-  HabitablePlanet,
-  #[assoc(path = "pixelc/browngasgiant.png")]
-  BrownGasGiant,
-  #[assoc(path = "pixelc/marslikeplanet.png")]
-  MarsLikePlanet,
-  #[assoc(path = "sandplanet.png")]
-  SandPlanet,
-  #[assoc(path = "hpbox.png")]
-  HPBox,
-  #[assoc(path = "sign.png")]
-  Sign,
-  #[assoc(path = "floating_island.png")]
-  FloatingIsland,
-  #[assoc(path = "spacepiratebase.png")]
-  SpacePirateBase,
-  #[assoc(path = "spaceshipwhite.png")]
-  SpaceshipWhite,
-  #[assoc(path = "spaceshipblue.png")]
-  SpaceshipBlue,
-  #[assoc(path = "spaceshipred.png")]
-  SpaceshipRed,
-  #[assoc(path = "spaceshipdarkred.png")]
-  SpaceshipDarkRed,
-  #[assoc(path = "spaceshippurple.png")]
-  SpaceshipPurple,
-  #[assoc(path = "spaceshipabandoned.png")]
-  SpaceshipAbandoned,
-  #[assoc(path = "wizardspaceship.png")]
-  WizardSpaceShip,
-  #[assoc(path = "spaceshipgreen.png")]
-  SpaceshipGreen,
-  #[assoc(path = "purpleenemyship.png")]
-  PurpleEnemyShip,
-  #[assoc(path = "spaceshipwhite2.png")]
-  SpaceshipWhite2,
-  #[assoc(path = "stone.png")]
-  Stone,
-  #[assoc(path = "pixelc/bricks.png")]
-  Bricks,
-  #[assoc(path = "pixelc/chest.png")]
-  Chest,
-  #[assoc(path = "pixelc/block_textures.png")]
-  BlockTextures,
-  #[assoc(path = "sun.png")]
-  Sun,
-  #[assoc(path = "fire.png")]
-  Fire,
-  #[assoc(path = "iceberg.png")]
-  Iceberg,
-  #[assoc(path = "coffee.png")]
-  Coffee,
-  #[assoc(path = "stickman.png")]
-  Stickman,
-  #[assoc(path = "grass.png")]
-  Grass,
-  #[assoc(path = "water.png")]
-  Water,
-  #[assoc(path = "tree.png")]
-  Tree,
-  #[assoc(path = "snow.png")]
-  Snow,
-  #[assoc(path = "penguin.png")]
-  Penguin,
-  #[assoc(path = "pixelc/missile.png")]
-  Missile,
-  // #[assoc(path = "pixelc/torch.png")]
-  // Torch,
-  #[assoc(path = "nasa_starmap.jpeg")]
-  NasaStarmap
+#[derive(Copy, Clone, Hash, Eq, PartialEq)]
+struct MySprite {
+  path: &'static str
 }
-#[derive(Assoc, Copy, Clone, Hash, Eq, PartialEq)]
-#[func(pub fn val(&self, h: Handle<Image>) -> StandardMaterial)]
-#[func(pub fn img(&self) -> MySprite)]
-enum MyImageMaterial {
-  #[assoc(img = MySprite::Snow)]
-  #[assoc(val = StandardMaterial { perceptual_roughness: 0.4,
-                                   metallic: 0.0,
-                                   reflectance: 0.5,
-                                   ior: 1.31,
-                                   base_color_texture: Some(h),
-                                   ..default() })]
-  Snow,
-  #[assoc(img = MySprite::Water)]
-  #[assoc(val = StandardMaterial { perceptual_roughness: 0.3,
+impl MySprite {
+  const fn new(path: &'static str) -> Self { Self { path } }
+  const ASTEROID: Self = Self::new("asteroid.png");
+  const BLOCKTEXTURES: Self = Self::new("pixelc/block_textures.png");
+  const BRICKS: Self = Self::new("pixelc/bricks.png");
+  const BROWNGASGIANT: Self = Self::new("pixelc/browngasgiant.png");
+  const CAR: Self = Self::new("car.png");
+  const CHEST: Self = Self::new("pixelc/chest.png");
+  const COFFEE: Self = Self::new("coffee.png");
+  const COIN: Self = Self::new("coin.png");
+  const CONTAINER: Self = Self::new("container.png");
+  const CRYSTALASTEROID: Self = Self::new("crystal_asteroid.png");
+  const CRYSTALMONSTER: Self = Self::new("crystal_monster.png");
+  const FIRE: Self = Self::new("fire.png");
+  const FLOATINGISLAND: Self = Self::new("floating_island.png");
+  const GATE: Self = Self::new("gate.png");
+  const GRASS: Self = Self::new("grass.png");
+  const GROUND: Self = Self::new("ground.png");
+  const HABITABLEPLANET: Self = Self::new("pixelc/habitableplanet.png");
+  const HPBOX: Self = Self::new("hpbox.png");
+  const ICEASTEROID: Self = Self::new("icesteroid.png");
+  const ICEBERG: Self = Self::new("iceberg.png");
+  const ICEPLANET: Self = Self::new("ice_planet.png");
+  const LAVAPLANET: Self = Self::new("lava_planet.png");
+  const MARSLIKEPLANET: Self = Self::new("pixelc/marslikeplanet.png");
+  const MISSILE: Self = Self::new("pixelc/missile.png");
+  const MUSHROOMMAN: Self = Self::new("mushroom_man.png");
+  const NASASTARMAP: Self = Self::new("nasa_starmap.jpeg");
+  const NOTE: Self = Self::new("note.png");
+  const PENGUIN: Self = Self::new("penguin.png");
+  const PLAYER: Self = Self::new("player.png");
+  const PURPLEENEMYSHIP: Self = Self::new("purpleenemyship.png");
+  const SANDPLANET: Self = Self::new("sandplanet.png");
+  const SIGN: Self = Self::new("sign.png");
+  const SNOW: Self = Self::new("snow.png");
+  const SPACECAT: Self = Self::new("space_cat.png");
+  const SPACECOWBOY: Self = Self::new("spacecowboy.png");
+  const SPACEMAN: Self = Self::new("spaceman.png");
+  const SPACEPIRATEBASE: Self = Self::new("spacepiratebase.png");
+  const SPACESHIPABANDONED: Self = Self::new("spaceshipabandoned.png");
+  const SPACESHIPBLUE: Self = Self::new("spaceshipblue.png");
+  const SPACESHIPDARKRED: Self = Self::new("spaceshipdarkred.png");
+  const SPACESHIPGREEN: Self = Self::new("spaceshipgreen.png");
+  const SPACESHIPPURPLE: Self = Self::new("spaceshippurple.png");
+  const SPACESHIPRED: Self = Self::new("spaceshipred.png");
+  const SPACESHIPWHITE2: Self = Self::new("spaceshipwhite2.png");
+  const SPACESHIPWHITE: Self = Self::new("spaceshipwhite.png");
+  const SPACESTATION: Self = Self::new("space_station.png");
+  const SPACEWIZARD: Self = Self::new("spacewizard.png");
+  const SPHERICALCOW: Self = Self::new("spherical_cow.png");
+  const STICKMAN: Self = Self::new("stickman.png");
+  const STONE: Self = Self::new("stone.png");
+  const SUN: Self = Self::new("sun.png");
+  const TENT: Self = Self::new("tent.png");
+  const TORCH: Self = Self::new("torch.png");
+  const TREE: Self = Self::new("tree.png");
+  const TREEMONSTER: Self = Self::new("treemonster.png");
+  const TURRET: Self = Self::new("turret.png");
+  const WATER: Self = Self::new("water.png");
+  const WHITECORNERS: Self = Self::new("white_corners.png");
+  const WIZARDSPACESHIP: Self = Self::new("wizardspaceship.png");
+  const WORMHOLE: Self = Self::new("wormhole.png");
+  const ZORP: Self = Self::new("zorp.png");
+}
+#[derive(Copy, Clone, Hash, Eq, PartialEq)]
+struct MyNewImageMaterial {
+  img: MySprite,
+  mat_fn: fn(Handle<Image>) -> StandardMaterial
+}
+impl MyNewImageMaterial {
+  const fn new(mat_fn: fn(Handle<Image>) -> StandardMaterial, img: MySprite) -> Self {
+    Self { img, mat_fn }
+  }
+  pub fn val(&self, h: Handle<Image>) -> StandardMaterial { (self.mat_fn)(h) }
+  pub fn img(&self) -> MySprite { self.img }
+  const GROUND: Self = Self::new(|h| StandardMaterial { perceptual_roughness: 0.8,
+                                                        metallic: 0.0,
+                                                        reflectance: 0.2,
+                                                        base_color_texture: Some(h),
+                                                        ..default() },
+                                 MySprite::GROUND);
+  const SNOW: Self = Self::new(|h| StandardMaterial { perceptual_roughness: 0.4,
                                                       metallic: 0.0,
                                                       reflectance: 0.5,
-                                                      base_color_texture:
-                                                      Some(h),
-                                                      ..default() })]
-  Water,
-  #[assoc(img = MySprite::Stone)]
-  #[assoc(val = StandardMaterial { perceptual_roughness: 0.8,
-                                                      metallic: 0.0,
-                                                      reflectance: 0.3,
-                                                      base_color_texture:
-                                                      Some(h),
-                                                      ..default() })]
-  Stone,
-  #[assoc(img = MySprite::Bricks)]
-  #[assoc(val = StandardMaterial { perceptual_roughness: 0.95,
-                                                      metallic: 0.0,
-                                                      reflectance: 0.1,
-                                                      base_color_texture:
-                                   Some(h),
-                                                      ..default() })]
-  Bricks,
-  #[assoc(img = MySprite::Grass)]
-  #[assoc(val = StandardMaterial { perceptual_roughness: 0.8,
-                                                      metallic: 0.0,
-                                                      reflectance: 0.2,
-                                                      base_color_texture:
-                                   Some(h),
-                                                      ..default() })]
-  Grass,
-  #[assoc(img = MySprite::Penguin)]
-  #[assoc(val = StandardMaterial::from(h))]
-  Penguin
+                                                      ior: 1.31,
+                                                      base_color_texture: Some(h),
+                                                      ..default() },
+                               MySprite::SNOW);
+  const WATER: Self = Self::new(|h| StandardMaterial { perceptual_roughness: 0.3,
+                                                       metallic: 0.0,
+                                                       reflectance: 0.5,
+                                                       base_color_texture: Some(h),
+                                                       ..default() },
+                                MySprite::WATER);
+  const STONE: Self = Self::new(|h| StandardMaterial { perceptual_roughness: 0.8,
+                                                       metallic: 0.0,
+                                                       reflectance: 0.3,
+                                                       base_color_texture: Some(h),
+                                                       ..default() },
+                                MySprite::STONE);
+  const BRICKS: Self = Self::new(|h| StandardMaterial { perceptual_roughness: 0.95,
+                                                        metallic: 0.0,
+                                                        reflectance: 0.1,
+                                                        base_color_texture: Some(h),
+                                                        ..default() },
+                                 MySprite::BRICKS);
+  const GRASS: Self = Self::new(|h| StandardMaterial { perceptual_roughness: 0.8,
+                                                       metallic: 0.0,
+                                                       reflectance: 0.2,
+                                                       base_color_texture: Some(h),
+                                                       ..default() },
+                                MySprite::GRASS);
+  const PENGUIN: Self = Self::new(From::from, MySprite::PENGUIN);
 }
-#[derive(Assoc, Copy, Clone, Hash, Eq, PartialEq)]
-#[func(pub fn val(&self) -> StandardMaterial)]
-pub enum MyMaterial {
-  #[assoc(val = StandardMaterial { unlit: true,
-                                   alpha_mode: AlphaMode::Mask(0.0),
-                                   ..GLOWY_COLOR.into() })]
-  GlowyMaterial,
-  #[assoc(val = StandardMaterial { unlit: true,
-                                   alpha_mode: AlphaMode::Mask(0.0),
-                                   ..GLOWY_COLOR_2.into() })]
-  GlowyMaterial2,
-  #[assoc(val = StandardMaterial { unlit: true,
-                                   alpha_mode: AlphaMode::Mask(0.0),
-                                   ..GLOWY_COLOR_3.into() })]
-  GlowyMaterial3,
-  #[assoc(val = StandardMaterial { unlit: true,
-                                   alpha_mode: AlphaMode::Mask(0.0001),
-                                   ..EXPLOSION_COLOR.into() })]
-  ExplosionMaterial,
-  #[assoc(val = StandardMaterial { unlit: true,
-                                   alpha_mode: AlphaMode::Mask(0.0001),
-                                   ..LASER_COLOR.into() })]
-  LaserMaterial,
-  #[assoc(val = StandardMaterial::from(Color::srgb(0.2, 0.7, 0.9)))]
-  ParticleMaterial,
-  #[assoc(val = StandardMaterial { unlit: true,
-                                   alpha_mode: AlphaMode::Blend,
-                                   ..Color::srgba(0.0, 0.0, 0.0, 0.0).into() })]
-  InvisibleMaterial,
-  #[assoc(val = StandardMaterial { unlit: true,
-                                   alpha_mode: AlphaMode::Blend,
-                                   ..Color::srgba(0.0, 0.3, 1.0, 0.1).into() })]
-  HoveredMaterial,
-  #[assoc(val = StandardMaterial { unlit: true,
-                                   alpha_mode: AlphaMode::Blend,
-                                   ..Color::srgba(0.0, 0.3, 1.0, 0.3).into() })]
-  PressedMaterial,
-  #[assoc(val = StandardMaterial { unlit: true,
-                                   alpha_mode: AlphaMode::Blend,
-                                   ..Color::srgba(0.0, 0.3, 1.0, 0.2).into() })]
-  SelectedMaterial
+#[derive(Copy, Clone, Hash, Eq, PartialEq)]
+struct MyNewMaterial {
+  mat_fn: fn() -> StandardMaterial
 }
-#[derive(Assoc, Copy, Clone, Hash, Eq, PartialEq)]
-#[func(pub const fn path_and_label(&self) -> (&'static str,&'static str))]
-pub enum MyScene {
-  #[assoc(path_and_label = ("lunarlander.glb", "Scene0"))]
-  LunarLander,
-  #[assoc(path_and_label = ("character_controller_demo.glb", "Scene0"))]
-  CharacterControllerDemo,
-  #[assoc(path_and_label = ("level.glb", "Scene0"))]
-  Level,
-  #[assoc(path_and_label = ("alevel.gltf", "Scene0"))]
-  ALevel,
-  #[assoc(path_and_label = ("this_here_level.glb", "Scene0"))]
-  IslandLevel,
-  #[assoc(path_and_label = ("somesketchlevel.glb", "Scene0"))]
-  SomeSketchLevel,
-  #[assoc(path_and_label = ("snowman.glb", "Scene0"))]
-  Snowman,
-  #[assoc(path_and_label = ("coffee.glb", "Scene0"))]
-  CoffeeScene,
-  #[assoc(path_and_label = ("goxel_level.glb", "Scene0"))]
-  GoxelLevel,
-  #[assoc(path_and_label = ("turtle level.gltf", "Scene0"))]
-  TurtleLevel,
-  #[assoc(path_and_label = ("wat.glb", "Scene0"))]
-  Wat
+impl MyNewMaterial {
+  const fn new(mat_fn: fn() -> StandardMaterial) -> Self { Self { mat_fn } }
+  pub fn val(&self) -> StandardMaterial { (self.mat_fn)() }
+  const GLOWY: Self = Self::new(|| StandardMaterial { unlit: true,
+                                                      alpha_mode: AlphaMode::Mask(0.0),
+                                                      ..GLOWY_COLOR.into() });
+  const GLOWY_2: Self = Self::new(|| StandardMaterial { unlit: true,
+                                                        alpha_mode: AlphaMode::Mask(0.0),
+                                                        ..GLOWY_COLOR_2.into() });
+  const GLOWY_3: Self = Self::new(|| StandardMaterial { unlit: true,
+                                                        alpha_mode: AlphaMode::Mask(0.0),
+                                                        ..GLOWY_COLOR_3.into() });
+  const EXPLOSION: Self = Self::new(|| StandardMaterial { unlit: true,
+                                                          alpha_mode:
+                                                            AlphaMode::Mask(0.0001),
+                                                          ..EXPLOSION_COLOR.into() });
+  const LASER: Self = Self::new(|| StandardMaterial { unlit: true,
+                                                      alpha_mode:
+                                                        AlphaMode::Mask(0.0001),
+                                                      ..LASER_COLOR.into() });
+  const PARTICLE: Self = Self::new(|| StandardMaterial::from(Color::srgb(0.2, 0.7, 0.9)));
+  const INVISIBLE: Self = Self::new(|| StandardMaterial { unlit: true,
+                                                          alpha_mode: AlphaMode::Blend,
+                                                          ..Color::srgba(0.0, 0.0, 0.0,
+                                                                         0.0).into() });
+  const HOVERED: Self = Self::new(|| StandardMaterial { unlit: true,
+                                                        alpha_mode: AlphaMode::Blend,
+                                                        ..Color::srgba(0.0, 0.3, 1.0,
+                                                                       0.1).into() });
+  const PRESSED: Self = Self::new(|| StandardMaterial { unlit: true,
+                                                        alpha_mode: AlphaMode::Blend,
+                                                        ..Color::srgba(0.0, 0.3, 1.0,
+                                                                       0.3).into() });
+  const SELECTED: Self = Self::new(|| StandardMaterial { unlit: true,
+                                                         alpha_mode: AlphaMode::Blend,
+                                                         ..Color::srgba(0.0, 0.3, 1.0,
+                                                                        0.2).into() });
 }
-// struct GenMesh2(pub fn() -> Mesh);
-// const CUBE: GenMesh2 = GenMesh2(|| Cuboid::new(0.7, 0.7, 0.7).into());
-#[derive(Assoc, Copy, Clone, Hash, Eq, PartialEq)]
-#[func(pub fn gen(&self) -> Mesh)]
-pub enum GenMesh {
-  #[assoc(gen = Cuboid::new(1.0, 1.0, 1.0).into())]
-  UnitCube,
-  #[assoc(gen = primitives::Cylinder::new(1.0, 1.0).into())]
-  UnitCylinder,
-  #[assoc(gen = Cuboid::new(0.7, 0.7, 0.7).into())]
-  Cube,
-  #[assoc(gen = Cuboid::new(2.0, 1.0, 1.0).into())]
-  BoxMesh,
-  #[assoc(gen = Cuboid::new(2.1, 0.3, 2.1).into())]
-  FlatBox,
-  #[assoc(gen = primitives::Capsule3d::default().into())]
-  Capsule,
-  #[assoc(gen = primitives::Torus::default().into())]
-  Torus,
-  #[assoc(gen = primitives::Sphere { radius: 1.0 }.into())]
-  Sphere,
-  #[assoc(gen = Cuboid::new(25.0, 0.1, 25.0).into())]
-  PlaneSize50,
-  #[assoc(gen = primitives::Rectangle::new(BILLBOARD_REL_SCALE, BILLBOARD_REL_SCALE).into())]
-  BillboardMeshSquare
+#[derive(Copy, Clone, Hash, Eq, PartialEq)]
+pub struct MyNewScene {
+  path: &'static str,
+  label: &'static str
+}
+impl MyNewScene {
+  pub const fn new(path: &'static str, label: &'static str) -> Self { Self { path, label } }
+  pub const fn path_and_label(&self) -> (&'static str, &'static str) {
+    (self.path, self.label)
+  }
+  pub const LUNAR_LANDER: Self = Self::new("lunarlander.glb", "Scene0");
+  pub const CHARACTER_CONTROLLER_DEMO: Self =
+    Self::new("character_controller_demo.glb", "Scene0");
+  pub const LEVEL: Self = Self::new("level.glb", "Scene0");
+  pub const A_LEVEL: Self = Self::new("alevel.gltf", "Scene0");
+  pub const ISLAND_LEVEL: Self = Self::new("this_here_level.glb", "Scene0");
+  pub const SOME_SKETCH_LEVEL: Self = Self::new("somesketchlevel.glb", "Scene0");
+  pub const SNOWMAN: Self = Self::new("snowman.glb", "Scene0");
+  pub const COFFEE_SCENE: Self = Self::new("coffee.glb", "Scene0");
+  pub const GOXEL_LEVEL: Self = Self::new("goxel_level.glb", "Scene0");
+  pub const TURTLE_LEVEL: Self = Self::new("turtle level.gltf", "Scene0");
+  pub const WAT: Self = Self::new("wat.glb", "Scene0");
+}
+#[derive(Copy, Clone, Hash, Eq, PartialEq)]
+pub struct GenNewMesh {
+  gen_fn: fn() -> Mesh
+}
+impl GenNewMesh {
+  const fn new(gen_fn: fn() -> Mesh) -> Self { Self { gen_fn } }
+  pub fn gen(&self) -> Mesh { (self.gen_fn)() }
+  pub const UNIT_CUBE: Self = Self::new(|| Cuboid::new(1.0, 1.0, 1.0).into());
+  pub const UNIT_CYLINDER: Self = Self::new(|| primitives::Cylinder::new(1.0, 1.0).into());
+  pub const CUBE: Self = Self::new(|| Cuboid::new(0.7, 0.7, 0.7).into());
+  pub const BOX: Self = Self::new(|| Cuboid::new(2.0, 1.0, 1.0).into());
+  pub const FLAT_BOX: Self = Self::new(|| Cuboid::new(2.1, 0.3, 2.1).into());
+  pub const CAPSULE: Self = Self::new(|| primitives::Capsule3d::default().into());
+  pub const TORUS: Self = Self::new(|| primitives::Torus::default().into());
+  pub const SPHERE: Self = Self::new(|| primitives::Sphere { radius: 1.0 }.into());
+  pub const PLANE_SIZE_50: Self = Self::new(|| Cuboid::new(25.0, 0.1, 25.0).into());
+  pub const BILLBOARD_MESH_SQUARE: Self = Self::new(|| {
+    primitives::Rectangle::new(BILLBOARD_REL_SCALE, BILLBOARD_REL_SCALE).into()
+  });
 }
 
 #[derive(Component, Clone, PartialEq, Eq, Default)]
 pub struct Visuals {
   text: Option<String>,
-  material_mesh: Option<(MyMaterial, GenMesh)>,
+  material_mesh: Option<(MyNewMaterial, GenNewMesh)>,
   shield_active: bool,
   sprite: Option<MySprite>,
   unlit: bool,
@@ -354,12 +282,12 @@ impl Visuals {
            unlit: true,
            ..default() }
   }
-  fn material_mesh(material: MyMaterial, mesh: GenMesh) -> Self {
+  fn material_mesh(material: MyNewMaterial, mesh: GenNewMesh) -> Self {
     Self { material_mesh: Some((material, mesh)),
            ..default() }
   }
-  fn material_sphere(material: MyMaterial) -> Self {
-    Self::material_mesh(material, GenMesh::Sphere)
+  fn material_sphere(material: MyNewMaterial) -> Self {
+    Self::material_mesh(material, GenNewMesh::SPHERE)
   }
   fn with_text(self, text: impl ToString) -> Self {
     Self { text: Some(text.to_string()),
@@ -418,16 +346,17 @@ pub fn visuals(camq: Query<&GlobalTransform, With<Camera3d>>,
                      With<VisualSprite>>,
                mut sprite_3d_params: bevy_sprite3d::Sprite3dParams,
                mut sprite_handles: Local<HashMap<MySprite, Handle<Image>>>,
-               mut mesh_handles: Local<HashMap<GenMesh, Handle<Mesh>>>,
-               mut material_handles: Local<HashMap<MyMaterial, Handle<StandardMaterial>>>,
+               mut mesh_handles: Local<HashMap<GenNewMesh, Handle<Mesh>>>,
+               mut material_handles: Local<HashMap<MyNewMaterial,
+                             Handle<StandardMaterial>>>,
                mut visual_child_entities: Local<HashMap<Entity, Entity>>) {
-  let mut get_material_handle = |material: MyMaterial| {
+  let mut get_material_handle = |material: MyNewMaterial| {
     material_handles.entry(material)
                     .or_insert_with(|| serv.add(material.val()))
                     .clone()
   };
 
-  let mut get_mesh_handle = |mesh: GenMesh| {
+  let mut get_mesh_handle = |mesh: GenNewMesh| {
     mesh_handles.entry(mesh)
                 .or_insert_with(|| serv.add(mesh.gen()))
                 .clone()
@@ -435,13 +364,13 @@ pub fn visuals(camq: Query<&GlobalTransform, With<Camera3d>>,
 
   let mut get_sprite_handle = |sprite: MySprite| {
     sprite_handles.entry(sprite)
-                  .or_insert_with(|| serv.load(format!("embedded://{}", sprite.path())))
+                  .or_insert_with(|| serv.load(format!("embedded://{}", sprite.path)))
                   .clone()
   };
 
   let text_style = TextStyle { font_size: 30.0,
                                ..default() };
-  let invisible_material = get_material_handle(MyMaterial::InvisibleMaterial);
+  let invisible_material = get_material_handle(MyNewMaterial::INVISIBLE);
 
   for (entity, mut visuals) in &mut visuals_q {
     if visuals.is_changed() || !visuals.done {
@@ -455,7 +384,7 @@ pub fn visuals(camq: Query<&GlobalTransform, With<Camera3d>>,
                                                                     c.spawn((
                     PbrBundle {
                         material: invisible_material.clone(),
-                        mesh: get_mesh_handle(GenMesh::Sphere),
+                        mesh: get_mesh_handle(GenNewMesh::SPHERE),
                         ..default()
                     },
                 ))
@@ -494,7 +423,7 @@ pub fn visuals(camq: Query<&GlobalTransform, With<Camera3d>>,
       }
 
       if visuals.targeted {
-        let target_overlay = get_sprite_handle(MySprite::WhiteCorners);
+        let target_overlay = get_sprite_handle(MySprite::WHITECORNERS);
         c.spawn((bevy_sprite3d::Sprite3d { image: target_overlay,
                                            pixels_per_metre: 100.0,
                                            double_sided: true,
@@ -548,11 +477,11 @@ fn toggle_flashlight(mut c: Commands,
                      mut playerq: Query<&mut Player>,
                      mut flashlightq: Query<&mut Visibility, With<PlayerFlashlight>>,
                      keyboard_input: Res<ButtonInput<KeyCode>>) {
-  if let Ok(mut player) = playerq.get_single_mut()
-     && keyboard_input.just_pressed(KeyCode::KeyF)
+  if keyboard_input.just_pressed(KeyCode::KeyF)
+     && let Ok(mut player) = playerq.get_single_mut()
   {
+    player.light_on = !player.light_on;
     for mut flashlight_visibility in &mut flashlightq {
-      player.light_on = !player.light_on;
       println("toggled flashlight");
       *flashlight_visibility = match *flashlight_visibility {
         Visibility::Inherited => Visibility::Hidden,
@@ -737,31 +666,23 @@ fn monster_movement(mut monsterq: Query<(&mut Navigation, &mut Monster, &Transfo
   }
 }
 pub fn player_movement(keyboard_input: Res<ButtonInput<KeyCode>>,
+                       gameover: Res<GameOver>,
                        camera_query: Query<&Transform, With<Camera3d>>,
                        mut player_query: Query<&mut Navigation, With<Player>>) {
-  let Ok(camera_transform) = camera_query.get_single() else {
-    return;
-  };
-  let Ok(mut navigation) = player_query.get_single_mut() else {
-    return;
-  };
-  let forward = Vec2::new(camera_transform.forward().x, camera_transform.forward().z).normalize_or_zero();
-  let right = Vec2::new(-forward.y, forward.x);
-  let movement_direction =
-    Vec2::new((keyboard_input.pressed(KeyCode::KeyD) as i32
-               - keyboard_input.pressed(KeyCode::KeyA) as i32) as f32,
-              (keyboard_input.pressed(KeyCode::KeyW) as i32
-               - keyboard_input.pressed(KeyCode::KeyS) as i32) as f32).normalize_or_zero();
-  let world_space_direction =
-    (movement_direction.x * right + movement_direction.y * forward).normalize_or_zero();
-  navigation.navigation_kind = NavigationKind::Vec2(world_space_direction);
-}
-#[derive(Bundle)]
-struct SceneSpaceObjectBundle((Handle<Scene>, CharacterBundle));
-impl SceneSpaceObjectBundle {
-  fn new(translation: Vec3, scale: f32, can_move: bool, scene: Handle<Scene>) -> Self {
-    Self((scene,
-          CharacterBundle::new(translation, can_move, Visuals::sprite(MySprite::Coffee))))
+  if let Ok(camera_transform) = camera_query.get_single()
+     && let Ok(mut navigation) = player_query.get_single_mut()
+     && !gameover.0
+  {
+    let forward =
+      vec2(camera_transform.forward().x, camera_transform.forward().z).normalize_or_zero();
+    let right = vec2(-forward.y, forward.x);
+    let Vec2 { x, y } = sum(filter_map(|(key, v)| keyboard_input.pressed(key).then_some(v),
+                                       [(KeyCode::KeyA, Vec2::NEG_X),
+                                        (KeyCode::KeyS, Vec2::NEG_Y),
+                                        (KeyCode::KeyD, Vec2::X),
+                                        (KeyCode::KeyW, Vec2::Y)])).normalize_or_zero();
+    let keyb_dir = (x * right) + (y * forward);
+    navigation.navigation_kind = NavigationKind::Vec2(keyb_dir);
   }
 }
 #[derive(Default, Resource)]
@@ -808,6 +729,7 @@ pub struct UIData {
   pub current_time_ticks: u32,
   pub interact_message: Option<String>,
   pub note: Vec<String>,
+  pub game_over: bool,
   pub infobox_data: Vec<String>
 }
 
@@ -850,6 +772,18 @@ fn ui(mut c: Commands,
       time: Res<TimeTicks>,
       view_root_q: Query<Entity, With<ViewRoot>>) {
   if view_root_q.is_empty() {
+    let game_over_popup = UIPopup { style: |sb| {
+                                      sb.font_size(55.0)
+                                        .justify_self(JustifySelf::Center)
+                                        .top(Val::Percent(50.0));
+                                    },
+                                    display_text_fn: |&UIData { game_over, .. }| {
+                                      if game_over {
+                                        vec!["Game Over".to_string()]
+                                      } else {
+                                        default()
+                                      }
+                                    } };
     let note_popup = UIPopup { style: |sb| {
                                  sb.justify_self(JustifySelf::Center)
                                    .top(Val::Percent(50.0));
@@ -859,7 +793,9 @@ fn ui(mut c: Commands,
                               sb.left(0).top(0);
                             },
                             display_text_fn: |uidata| uidata.infobox_data.clone() };
-    let root = vec![ViewChild::new(note_popup), ViewChild::new(infobox),];
+    let root = vec![ViewChild::new(note_popup),
+                    ViewChild::new(infobox),
+                    ViewChild::new(game_over_popup),];
     c.spawn(root.to_root());
   }
   if let Ok((player_entity, player, player_transform)) = playerq.get_single() {
@@ -965,6 +901,15 @@ pub struct Player {
   notes_found: usize,
   light_on: bool
 }
+#[derive(States, Default, Debug, Clone, PartialEq, Eq, Hash)]
+enum GameState {
+  Running,
+  #[default]
+  NotStarted,
+  GameOver
+}
+#[derive(Resource, Default)]
+struct GameOver(bool);
 fn proximity_system(mut c: Commands,
                     mut player_query: Query<(Entity,
                            &mut Player,
@@ -974,6 +919,8 @@ fn proximity_system(mut c: Commands,
                           Without<Player>>,
                     monsterq: Query<(Entity, &Monster)>,
                     noteq: Query<(Entity, &Note)>,
+                    mut game_over: ResMut<GameOver>,
+                    time: Res<TimeTicks>,
                     mut uidata: ResMut<UIData>,
                     flashlightq: Query<Entity, With<PlayerFlashlight>>,
                     playerambientlightq: Query<Entity, With<PlayerAmbientlight>>,
@@ -998,14 +945,11 @@ fn proximity_system(mut c: Commands,
                                   .ok()
                            },
                            &current_proximal_entities).unwrap_or_default();
-    // for &e in &prev_proximal_entities {
-    //   if let Ok() = noteq.get(e) {
-    //     uidata.note = ;
-    //   }
-    // }
     for &e in new_proximal_entities {
       println("new proximal entity");
       if is_monster(e) {
+        game_over.0 = true;
+        uidata.game_over = true;
         // monster got player
         c.entity(player_entity)
          .remove::<LockedAxes>()
@@ -1101,12 +1045,16 @@ fn prob(p: f32) -> bool { p > rand::random::<f32>() }
 
 use bevy_mesh_terrain::{terrain_config::TerrainConfig, TerrainMeshPlugin};
 const NOTES:&[&'static str] = &[
-  "Diary entry 1\n me and my friends are camping in this forest.\n I heard some strange sounds. could be a bear.\n yikes.",
-  "Diary entry 2\n cant find my friend.",
-  "Diary entry 3\n been looking for him. hear more strange sounds",
-  "Diary entry 4\n i swear i saw a tree wink at me",
-  "Diary entry 5\n oh my god the trees are chasing me!",
-  "Diary entry 6\n they got me. I'm turning into a tree. it's over",
+  "Diary entry 1\n me and my friends, Billy and Sallie are camping in this forest.\n I heard some strange sounds. could be a bear.\n yikes.",
+  "Diary entry 2\n can't find Billy.",
+  "Diary entry 3\n I've been looking for Billy. I heard more strange sounds. Don't see any bears.",
+  "Diary entry 4\n I haven't been able to find Sallie",
+  "Diary entry 4\n Now Sallie is also looking for Billy",
+  "Diary entry 5\n Now I can't find Sallie. Damn",
+  "Diary entry 6\n Where could they have gone?",
+  "Diary entry 7\n I think I saw a tree move. I must be seeing things",
+  "Diary entry 8\n oh my god the trees are chasing me!",
+  "Diary entry 9\n they got me. I'm turning into a tree. it's over",
   "Diary entry 7\n",
   "Diary entry 8\n",
   "Diary entry 9\n",
@@ -1133,50 +1081,50 @@ const WORLD_MAP: &[&'static str] =
     "w     wttw   wttw                                  T   n     T                 w",
     "w     wwww   wwww                    n          t         t              n     w",
     "w                                                                              w",
-    "w                                         t         t  T        g              w",
+    "w                       t                 t         t  T        g              w",
     "w                                  t                                   t       w",
     "w                                  t                                   t       w",
-    "w   l                              t                                   t       w",
+    "w   l     t                        t                                   t       w",
     "w                                  t                                   t       w",
     "w                                         t     n     t      t                 w",
-    "w                                                                              w",
+    "w         t             t                                                      w",
     "w                                  t    t                         n            w",
     "w                                                                              w",
     "w                                                                              w",
     "w                   l                   l                     l                w",
     "w                                                                              w",
+    "wggg                                                                           w",
+    "w                                                t                             w",
+    "w   l  t                                                                       w",
+    "wttttttt  tttwwww         t                                                    w",
+    "w                         t                                                l   w",
+    "w  n                l                   t             gt                       w",
+    "w          l                                                                   w",
     "w                                                                              w",
-    "w                                                                              w",
-    "w   l                                                                          w",
-    "w                                                                              w",
-    "w                                                                          l   w",
-    "w                                                                              w",
-    "w                                                                              w",
-    "w                                                                              w",
-    "w  tt wwwwwwwwwwwww                                                            w",
-    "w          t      t                                                            w",
-    "w                                                                              w",
+    "w  tt wwwwwwwwwwwwww  n                                                        w",
+    "w          t      tw      t                                l                   w",
+    "w    t            gwwwwwwwwwww        t                                        w",
+    "w         t    t  t      ttt w                  t                 t            w",
+    "w   l                    tg  w                                                 w",
+    "w                            w                                                 w",
+    "w   t      t   t  g            l                                               w",
+    "w                                     t                                        w",
     "w                 t                                                            w",
-    "w   l                                   t        t       t            t        w",
-    "w                  w                      t     n     t      t                 w",
-    "w   t      t   t   w                                                           w",
-    "w                  w               t    t    l                    n            w",
-    "w   www           tw                                                           w",
-    "w   www    t       w                    t        t       t            t        w",
-    "w   www            w                      t     n     t      t                 w",
-    "w   l      t      t                                                            w",
-    "w       wwwwwwwwwwwwwww            t    t                         n            w",
-    "w   ttt               w                                                        w",
-    "w          ttt        w                 t        t       t            t        w",
-    "wwwwwww p w           w                   t     n     t      t                 w",
-    "wwwwwww   w t  t tt   w                                                        w",
-    "wwwwwww c w  l        w            t    t                         n            w",
-    "wwwwwww   w n     l   w                                                        w",
-    "w         w  tt   t t w                 t        t       t            t        w",
+    "w          t                                    t           t                  w",
+    "w                              l                                               w",
+    "w   l      t      tw                                       l           t       w",
+    "w                                                                              w",
+    "w   ttt                               t                                        w",
+    "w          ttt                                                                 w",
+    "wwwwwww p w                     t             t             t          t       w",
+    "wwwwwww   w t  t tt                                                            w",
+    "wwwwwww c w  l                                                                 w",
+    "wwwwwww   w n     l              t             t          t           t        w",
+    "w         w  tt   t t                                                          w",
     "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww"];
 const NOTE_FIND_RANGE: f32 = 1.8;
 fn note(translation: Vec3, note_data: &'static str) -> impl Bundle {
-  (Visuals::sprite(MySprite::Note),
+  (Visuals::sprite(MySprite::NOTE),
    Note(note_data),
    Proximal { distance: NOTE_FIND_RANGE },
    SpatialBundle { transform: Transform { translation,
@@ -1188,7 +1136,7 @@ fn note(translation: Vec3, note_data: &'static str) -> impl Bundle {
                    ..default() })
 }
 fn torch(pos: Vec3) -> impl Bundle {
-  (Visuals::unlit_sprite(MySprite::Torch),
+  (Visuals::unlit_sprite(MySprite::TORCH),
    FaceCamera,
    PointLightBundle { transform: Transform::from_translation(pos),
                       point_light: TORCH_LIGHT,
@@ -1198,33 +1146,33 @@ fn ghost(pos: Vec3) -> impl Bundle {
   (Monster { is_dormant: true },
    name("ghost"),
    Navigation::new(PLAYER_MAX_SPEED),
-   CharacterBundle::new(pos, true, Visuals::sprite(MySprite::SpaceWizard)))
+   CharacterBundle::new(pos, true, Visuals::sprite(MySprite::SPACEWIZARD)))
 }
 fn monster(pos: Vec3) -> impl Bundle {
   (Monster { is_dormant: true },
    Proximal { distance: MONSTER_CATCH_RANGE },
    name("monster"),
    Navigation::new(MONSTER_MAX_SPEED),
-   CharacterBundle::new(pos, true, Visuals::sprite(MySprite::SpaceWizard)))
+   CharacterBundle::new(pos, true, Visuals::sprite(MySprite::SPACEWIZARD)))
 }
 fn treemonster(pos: Vec3) -> impl Bundle {
   (Monster { is_dormant: true },
    name("tree monster"),
    Proximal { distance: MONSTER_CATCH_RANGE },
    Navigation::new(MONSTER_MAX_SPEED),
-   CharacterBundle::new(pos, true, Visuals::sprite(MySprite::TreeMonster)))
+   CharacterBundle::new(pos, true, Visuals::sprite(MySprite::TREEMONSTER)))
 }
 fn tree(pos: Vec3) -> impl Bundle {
-  (name("ghost"), CharacterBundle::new(pos, false, Visuals::sprite(MySprite::Tree)))
+  (name("ghost"), CharacterBundle::new(pos, false, Visuals::sprite(MySprite::TREE)))
 }
 fn tent(pos: Vec3) -> impl Bundle {
   (name("tent"),
    Note("It's a tent"),
    Proximal { distance: NOTE_FIND_RANGE },
-   CharacterBundle::new(pos, false, Visuals::sprite(MySprite::Tent)))
+   CharacterBundle::new(pos, false, Visuals::sprite(MySprite::TENT)))
 }
 fn car(pos: Vec3) -> impl Bundle {
-  (Visuals::unlit_sprite(MySprite::Car),
+  (Visuals::unlit_sprite(MySprite::CAR),
    Note("You thought it'd be fun to drive through this forest but your car ran out of gas"),
    Proximal { distance: NOTE_FIND_RANGE },
    FaceCamera,
@@ -1238,13 +1186,19 @@ fn player(translation: Vec3) -> impl Bundle {
   (Player::default(),
    name("You"),
    Navigation::new(PLAYER_MAX_SPEED),
-   CharacterBundle::new(translation, true, Visuals::sprite(MySprite::Player)))
+   CharacterBundle::new(translation, true, Visuals::sprite(MySprite::PLAYER)))
 }
 
-fn reset(mut world:&mut World){
-  world.clear_entities()
+// fn reset(mut world: &mut World) {
+//   let mut gameover = world.resource_mut::<GameOver>();
+//   if gameover.0 {
+//     gameover.0 = false;
 
-}
+//     // world.clear_entities();
+//     // bevy::ecs::system::RunSystemOnce::run_system_once(world, setup);
+//   }
+// }
+// fn init(mut world: &mut World) { world.clear_entities() }
 pub fn setup(playerq: Query<&Transform, With<Player>>,
              serv: Res<AssetServer>,
              mut meshes: ResMut<Assets<Mesh>>,
@@ -1252,10 +1206,10 @@ pub fn setup(playerq: Query<&Transform, With<Player>>,
              mut c: Commands) {
   let cube_collider = Cuboid::default().collider();
   let ground_mesh =
-    bevy::math::primitives::Plane3d::new(Vec3::Y, Vec2::new(50.0, 50.0)).mesh()
-                                                                        .build();
+    bevy::math::primitives::Plane3d::new(Vec3::Y, Vec2::new(100.0, 100.0)).mesh()
+                                                                          .build();
   let ground_collider = avian3d::prelude::Collider::trimesh_from_mesh(&ground_mesh).unwrap();
-  let ground_texture = serv.load("embedded://grass.png");
+  let ground_texture = serv.load("embedded://ground.png");
   let ground_material = serv.add(StandardMaterial { perceptual_roughness: 0.8,
                                                     metallic: 0.0,
                                                     reflectance: 0.2,
@@ -1273,14 +1227,6 @@ pub fn setup(playerq: Query<&Transform, With<Player>>,
   let cube_collider = Collider::convex_hull_from_mesh(&cube_mesh).unwrap();
   let cube_mesh_handle = serv.add(cube_mesh);
   let position = Vec3::new(0.0, 4.0, 0.0);
-  // c.spawn((RigidBody::Dynamic,
-  //          ColliderMassProperties::new(&cube_collider, 1.0),
-  //          cube_collider.clone(),
-  //          PbrBundle { mesh: cube_mesh_handle.clone(),
-  //                      material: ground_material.clone(),
-  //                      transform:
-  //                        Transform::from_translation(position).with_scale(Vec3::splat(3.5)),
-  //                      ..default() }));
   let mut num_notes_spawned = 0;
 
   for (x, y, tile) in enumerate(WORLD_MAP).flat_map(move |(y, line)| {
@@ -1288,9 +1234,9 @@ pub fn setup(playerq: Query<&Transform, With<Player>>,
                                                 .map(move |(x, tile)| (x, y, tile))
                                           })
   {
-    let pos = Vec3::new(x as f32 * TILE_SIZE,
-                        CHARACTER_HEIGHT * 0.5,
-                        y as f32 * TILE_SIZE);
+    let pos = vec3(x as f32 * TILE_SIZE,
+                   CHARACTER_HEIGHT * 0.5,
+                   y as f32 * TILE_SIZE);
 
     match tile {
       'w' => {
@@ -1443,7 +1389,7 @@ fn spawn_skybox(serv: Res<AssetServer>,
     // VolumetricFogSettings
     let skybox_handle = skybox_handle.get_or_insert_with(|| {
                                        serv.load(format!("embedded://{}",
-                                                         MySprite::NasaStarmap.path()))
+                                                         MySprite::NASASTARMAP.path))
                                      })
                                      .clone();
     println("hmm1");
@@ -1523,7 +1469,10 @@ pub fn main() {
       QuillOverlaysPlugin,
     ))// .add_plugins(add_global_highlight)
     // .add_event::<GuiInputEvent>()
+
+    .init_state::<GameState>()
     .init_resource::<UIData>()
+    .init_resource::<GameOver>()
     .init_resource::<TimeTicks>()
     .insert_resource(gravity)
     .insert_resource(solver_config)
