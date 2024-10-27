@@ -46,6 +46,9 @@ use {avian3d::prelude::*,
      std::f32::consts::PI};
 // ui::UIData
 
+pub const AMBIENT_LIGHT_COLOR: Color = Color::hsv(301.0, 1.0, 1.0);
+pub const CLEAR_COLOR: Color = Color::hsv(301.0, 1.0, 0.07);
+
 pub const GLOWY_COLOR: Color = Color::srgb(13.99, 11.32, 50.0);
 pub const GLOWY_COLOR_2: Color = Color::srgb(30.0, 20.7, 10.5);
 pub const GLOWY_COLOR_3: Color = Color::srgb(0.0, 30.0, 0.0);
@@ -91,6 +94,7 @@ impl MySprite {
   const NOTE: Self = Self::new("note.png");
   const PENGUIN: Self = Self::new("penguin.png");
   const PLAYER: Self = Self::new("player.png");
+  const PORTAL: Self = Self::new("portal.png");
   const PURPLEENEMYSHIP: Self = Self::new("purpleenemyship.png");
   const SANDPLANET: Self = Self::new("sandplanet.png");
   const SIGN: Self = Self::new("sign.png");
@@ -138,39 +142,33 @@ impl MyNewImageMaterial {
   const GROUND: Self = Self::new(|h| StandardMaterial { perceptual_roughness: 0.8,
                                                         metallic: 0.0,
                                                         reflectance: 0.2,
-                                                        base_color_texture: Some(h),
-                                                        ..default() },
+                                                        ..h.into() },
                                  MySprite::GROUND);
   const SNOW: Self = Self::new(|h| StandardMaterial { perceptual_roughness: 0.4,
                                                       metallic: 0.0,
                                                       reflectance: 0.5,
                                                       ior: 1.31,
-                                                      base_color_texture: Some(h),
-                                                      ..default() },
+                                                      ..h.into() },
                                MySprite::SNOW);
   const WATER: Self = Self::new(|h| StandardMaterial { perceptual_roughness: 0.3,
                                                        metallic: 0.0,
                                                        reflectance: 0.5,
-                                                       base_color_texture: Some(h),
-                                                       ..default() },
+                                                       ..h.into() },
                                 MySprite::WATER);
   const STONE: Self = Self::new(|h| StandardMaterial { perceptual_roughness: 0.8,
                                                        metallic: 0.0,
                                                        reflectance: 0.3,
-                                                       base_color_texture: Some(h),
-                                                       ..default() },
+                                                       ..h.into() },
                                 MySprite::STONE);
   const BRICKS: Self = Self::new(|h| StandardMaterial { perceptual_roughness: 0.95,
                                                         metallic: 0.0,
                                                         reflectance: 0.1,
-                                                        base_color_texture: Some(h),
-                                                        ..default() },
+                                                        ..h.into() },
                                  MySprite::BRICKS);
   const GRASS: Self = Self::new(|h| StandardMaterial { perceptual_roughness: 0.8,
                                                        metallic: 0.0,
                                                        reflectance: 0.2,
-                                                       base_color_texture: Some(h),
-                                                       ..default() },
+                                                       ..h.into() },
                                 MySprite::GRASS);
   const PENGUIN: Self = Self::new(From::from, MySprite::PENGUIN);
 }
@@ -412,6 +410,7 @@ pub fn visuals(camq: Query<&GlobalTransform, With<Camera3d>>,
                    bevy_sprite3d::Sprite3d { image: sprite_handle,
                                              pixels_per_metre: image_height as f32,
                                              double_sided: true,
+                                             alpha_mode: AlphaMode::Blend,
                                              unlit: visuals.unlit,
                                              transform: Transform::from_xyz(0.0, 0.0,
                                                                             0.0),
@@ -554,27 +553,20 @@ fn avg<T: std::iter::Sum + std::ops::Div<f32, Output = T>>(coll: impl IntoIterat
 pub fn capsule_from_height_and_radius(height: f32, radius: f32) -> Collider {
   Collider::capsule(height - (radius * 2.0), radius)
 }
-#[derive(Component, Clone, Default)]
-pub struct SpaceObject {
-  pub scale: f32,
-  pub click_target_entity: Option<Entity>
-}
-#[derive(Component, Clone)]
-pub struct ClickTarget;
-pub fn click_target(mut parent_q: Query<&Parent>,
-                    mut click_events: EventReader<bevy_mod_picking::events::Pointer<bevy_mod_picking::events::Click>>,
-                    mut player_q: Query<&mut Player>) {
-  if let Ok(mut player) = player_q.get_single_mut() {
-    for event in click_events.read() {
-      println(debugfmt(event));
-      let mut root_entity = event.target;
-      while let Ok(parent) = parent_q.get(root_entity) {
-        root_entity = parent.get();
-      }
-      println!("Player target set to {root_entity}");
-    }
-  }
-}
+// pub fn click_target(mut parent_q: Query<&Parent>,
+//                     mut click_events: EventReader<bevy_mod_picking::events::Pointer<bevy_mod_picking::events::Click>>,
+//                     mut player_q: Query<&mut Player>) {
+//   if let Ok(mut player) = player_q.get_single_mut() {
+//     for event in click_events.read() {
+//       println(debugfmt(event));
+//       let mut root_entity = event.target;
+//       while let Ok(parent) = parent_q.get(root_entity) {
+//         root_entity = parent.get();
+//       }
+//       println!("Player target set to {root_entity}");
+//     }
+//   }
+// }
 // type ClickTargetChild = (PbrBundle,
 //                          NotShadowCaster,
 //                          NotShadowReceiver,
@@ -655,7 +647,7 @@ fn monster_movement(mut monsterq: Query<(&mut Navigation, &mut Monster, &Transfo
         monster.is_dormant = false;
       } else {
         if !monster.is_dormant {
-          if time.0 % 600 == 0 {
+          if time.0 % 300 == 0 {
             let dir = random::<Dir2>().as_vec2().normalize_or_zero();
             *monsternav = Navigation { max_speed: MONSTER_MAX_SPEED,
                                        navigation_kind: NavigationKind::Vec2(dir) };
@@ -800,15 +792,17 @@ fn ui(mut c: Commands,
   }
   if let Ok((player_entity, player, player_transform)) = playerq.get_single() {
     let player_pos = player_transform.translation;
-    let infobox_data = map(ToString::to_string, [format!("{:.1}", player_pos).as_str(),
-                                                 format!("you've found {} notes",
-                                                         player.notes_found).as_str(),
-                                                 "w,a,s,d: move",
-                                                 "f: toggle flashlight"]) // .chain(map(|(item, n)| {
-                                                                         //              format!("{} {:?}s", n, item)
-                                                                         //            },
-                                                                         //            player_inventory.0.clone()))
-                                                                         .collect();
+    let player_light_on = player.light_on;
+    let infobox_data = map(ToString::to_string,
+                           [format!("{:.1}", player_pos).as_str(),
+                            format!("you've found {} notes", player.notes_found).as_str(),
+                            format!("light on: {player_light_on}",).as_str(),
+                            "w,a,s,d: move",
+                            "f: toggle flashlight"]) // .chain(map(|(item, n)| {
+                                                    //              format!("{} {:?}s", n, item)
+                                                    //            },
+                                                    //            player_inventory.0.clone()))
+                                                    .collect();
 
     let current_time = time.0;
     let current_time_ticks = current_time;
@@ -854,8 +848,8 @@ const FOG_SETTINGS: FogSettings =
                 directional_light_color: Color::NONE,
                 directional_light_exponent: 8.0 };
 
-pub const AMBIENT_LIGHT: AmbientLight = AmbientLight { color: Color::WHITE,
-                                                       brightness: 10.0 };
+pub const AMBIENT_LIGHT: AmbientLight = AmbientLight { color: AMBIENT_LIGHT_COLOR,
+                                                       brightness: 14.0 };
 const PLAYER_LIGHT_FLASHLIGHT: SpotLight =
   SpotLight { color: Color::WHITE,
               intensity: 600_000.0,
@@ -870,7 +864,7 @@ const TORCH_LIGHT: PointLight =
   PointLight { color: Color::hsv(33.0, 1.0, 0.5),
                intensity: 60_000.0,
                radius: 0.0,
-               range: 5.0,
+               range: 8.0,
                shadows_enabled: true,
                shadow_depth_bias: PointLight::DEFAULT_SHADOW_DEPTH_BIAS / 10.0,
                shadow_normal_bias: PointLight::DEFAULT_SHADOW_NORMAL_BIAS / 10.0 };
@@ -887,7 +881,7 @@ const MONSTER_MAX_SPEED_CHASE: f32 = 2.0;
 const MONSTER_MAX_SPEED: f32 = 1.0;
 const PLAYER_INTERACTION_RANGE: f32 = 3.0;
 const MONSTER_CATCH_RANGE: f32 = 1.5;
-const MONSTER_SEE_DARK_RANGE: f32 = 5.0;
+const MONSTER_SEE_DARK_RANGE: f32 = 4.0;
 const MONSTER_SEE_LIT_RANGE: f32 = 12.0;
 
 #[derive(Component, new)]
@@ -1071,56 +1065,56 @@ const NOTES:&[&'static str] = &[
 ];
 const WORLD_MAP: &[&'static str] =
   &["wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww",
-    "w         g g                        n       t      t                          w",
-    "w         t t                                                     n            w",
-    "w     wwwww wwwwwwww                    t  l    t         t                t   w",
-    "w     wt  tlt  tw                                                              w",
-    "w     w    n    w                      g     t    n             g              w",
-    "w     w         w                                    T    T  t       t         w",
+    "w         g g                        n       t      t                  g       w",
+    "w         t t                                                                  w",
+    "w     wwwww wwwwwwww                    t       t         t          t     t   w",
+    "w     wt  tlt  tw                                 l                  tP        w",
+    "w     w    n    w                      g     t    n             t    t         w",
+    "w     w         w            t                                       t         w",
     "w     w  w   w  w                       t                                      w",
-    "w     wttw   wttw                                  T   n     T                 w",
-    "w     wwww   wwww                    n          t         t              n     w",
+    "w     wttw   wttw                    l           g                             w",
+    "w                                    n          t                              w",
     "w                                                                              w",
-    "w                       t                 t         t  T        g              w",
+    "w              t        t                 t                     g              w",
     "w                                  t                                   t       w",
+    "w  l                                                                   t       w",
+    "w  n      t                                                            t       w",
     "w                                  t                                   t       w",
-    "w   l     t                        t                                   t       w",
-    "w                                  t                                   t       w",
-    "w                                         t     n     t      t                 w",
-    "w         t             t                                                      w",
-    "w                                  t    t                         n            w",
+    "w                                         t     nl    t      t                 w",
+    "w         t             t           g                                          w",
+    "w                                  t    t                         nl           w",
     "w                                                                              w",
+    "w                                                            t                 w",
+    "w       t                                                           t          w",
     "w                                                                              w",
-    "w                   l                   l                     l                w",
-    "w                                                                              w",
-    "wggg                                                                           w",
+    "wggg                           t                                               w",
     "w                                                t                             w",
-    "w   l  t                                                                       w",
-    "wttttttt  tttwwww         t                                                    w",
-    "w                         t                                                l   w",
-    "w  n                l                   t             gt                       w",
-    "w          l                                                                   w",
+    "w      t                                                                       w",
+    "wttttttt        t         t                                         t          w",
+    "w  l                      t                                              nl    w",
+    "w  n                                    t              t                       w",
+    "w                              t         Tl                                    w",
+    "w                     l                   n                         t          w",
+    "w  tt                 n                                                        w",
+    "w          t      t       t           Tl     Tl          nl   g                w",
+    "w    t            g                   t                                        w",
+    "w         t    t  t      ttt                    t                 t            w",
+    "w                        tg                                                    w",
     "w                                                                              w",
-    "w  tt wwwwwwwwwwwwww  n                                                        w",
-    "w          t      tw      t                                l                   w",
-    "w    t            gwwwwwwwwwww        t                                        w",
-    "w         t    t  t      ttt w                  t                 t            w",
-    "w   l                    tg  w                                                 w",
-    "w                            w                                                 w",
-    "w   t      t   t  g            l                                               w",
+    "w   t      t   t  g                                                            w",
     "w                                     t                                        w",
-    "w                 t                                                            w",
+    "w                 t       t                                                    w",
     "w          t                                    t           t                  w",
-    "w                              l                                               w",
-    "w   l      t      tw                                       l           t       w",
+    "w                                                                              w",
+    "w          t      tw                      t               nl           t       w",
     "w                                                                              w",
     "w   ttt                               t                                        w",
-    "w          ttt                                                                 w",
+    "w          ttt            t                                                    w",
     "wwwwwww p w                     t             t             t          t       w",
     "wwwwwww   w t  t tt                                                            w",
-    "wwwwwww c w  l                                                                 w",
-    "wwwwwww   w n     l              t             t          t           t        w",
-    "w         w  tt   t t                                                          w",
+    "wwwwwww c w                                                                    w",
+    "wwwwwww   w n                    t             t          t           t        w",
+    "w         w ltt   t t                                                          w",
     "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww"];
 const NOTE_FIND_RANGE: f32 = 1.8;
 fn note(translation: Vec3, note_data: &'static str) -> impl Bundle {
@@ -1138,6 +1132,38 @@ fn note(translation: Vec3, note_data: &'static str) -> impl Bundle {
 fn torch(pos: Vec3) -> impl Bundle {
   (Visuals::unlit_sprite(MySprite::TORCH),
    FaceCamera,
+   PointLightBundle { transform: Transform::from_translation(pos),
+                      point_light: TORCH_LIGHT,
+                      ..default() })
+}
+#[derive(Component, Clone)]
+struct Portal;
+fn portal_teleport(mut c: Commands,
+                   mut playerq: Query<&mut Player>,
+                   mut portalq: Query<(&Transform, &Portal)>,
+                   mut flashlightq: Query<&mut Visibility, With<PlayerFlashlight>>,
+                   keyboard_input: Res<ButtonInput<KeyCode>>) {
+  if keyboard_input.just_pressed(KeyCode::KeyF)
+     && let Ok(mut player) = playerq.get_single_mut()
+  {
+    player.light_on = !player.light_on;
+    for mut flashlight_visibility in &mut flashlightq {
+      println("toggled flashlight");
+      *flashlight_visibility = match *flashlight_visibility {
+        Visibility::Inherited => Visibility::Hidden,
+        Visibility::Hidden => Visibility::Visible,
+        Visibility::Visible => Visibility::Hidden
+      }
+    }
+  }
+}
+fn portal(pos: Vec3) -> impl Bundle {
+  (name("portal"),
+   Note("what the heck is this?"),
+   Proximal { distance: NOTE_FIND_RANGE },
+   FaceCamera,
+   Portal,
+   Visuals::unlit_sprite(MySprite::PORTAL),
    PointLightBundle { transform: Transform::from_translation(pos),
                       point_light: TORCH_LIGHT,
                       ..default() })
@@ -1267,6 +1293,9 @@ pub fn setup(playerq: Query<&Transform, With<Player>>,
       'g' => {
         c.spawn(treemonster(pos));
       }
+      'P' => {
+        c.spawn(portal(pos));
+      }
       'p' => {
         let player_entity = c.spawn(player(pos)).id();
         c.spawn((PlayerFlashlight,
@@ -1294,8 +1323,8 @@ pub fn setup(playerq: Query<&Transform, With<Player>>,
         spawn_ambient_light();
         spawn_ambient_light();
         spawn_ambient_light();
-        spawn_ambient_light();
-        spawn_ambient_light();
+        // spawn_ambient_light();
+        // spawn_ambient_light();
       }
       _ => {}
     }
@@ -1305,17 +1334,17 @@ pub fn setup(playerq: Query<&Transform, With<Player>>,
   //          TerrainConfig::load_from_file("assets/default_terrain/terrain_config.ron"),
   //          TerrainData::new()));
 
-  c.spawn(PbrBundle {
-    mesh: meshes.add(Circle::new(4.0)),
-    material: materials.add(Color::WHITE),
-    transform: Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
-    ..default()
-  });
+  // c.spawn(PbrBundle {
+  //   mesh: meshes.add(Circle::new(4.0)),
+  //   material: materials.add(Color::WHITE),
+  //   transform: Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
+  //   ..default()
+  // });
   // let colorful_mat = serv.add(StandardMaterial::from(serv.add(colorful_texture())));
-  c.spawn(PointLightBundle { point_light: PointLight { shadows_enabled: true,
-                                                       ..default() },
-                             transform: Transform::from_xyz(4.0, 8.0, 4.0),
-                             ..default() });
+  // c.spawn(PointLightBundle { point_light: PointLight { shadows_enabled: true,
+  //                                                      ..default() },
+  //                            transform: Transform::from_xyz(4.0, 8.0, 4.0),
+  //                            ..default() });
 
   let fov = std::f32::consts::PI / 4.0;
 
@@ -1352,7 +1381,7 @@ pub fn setup(playerq: Query<&Transform, With<Player>>,
                       // yaw_lower_limit: todo!(),
                       pitch_upper_limit: Some(pitch_upper_limit_radians),
                       pitch_lower_limit: Some(pitch_lower_limit_radians),
-                      zoom_upper_limit: Some(10.0),
+                      zoom_upper_limit: Some(8.0),
                       zoom_lower_limit: Some(2.0),
                       // orbit_sensitivity: todo!(),
                       orbit_smoothness: 0.0,
@@ -1463,7 +1492,7 @@ pub fn main() {
       bevy_sprite3d::Sprite3dPlugin,
       bevy_panorbit_camera::PanOrbitCameraPlugin,
       bevy_mod_billboard::prelude::BillboardPlugin,
-      bevy_mod_picking::DefaultPickingPlugins,
+      // bevy_mod_picking::DefaultPickingPlugins,
       avian3d::PhysicsPlugins::default(),
       QuillPlugin,
       QuillOverlaysPlugin,
@@ -1476,8 +1505,8 @@ pub fn main() {
     .init_resource::<TimeTicks>()
     .insert_resource(gravity)
     .insert_resource(solver_config)
-  // .insert_resource(ClearColor(Color::BLACK))
-    .insert_resource(bevy_mod_picking::debug::DebugPickingMode::Normal)
+  .insert_resource(ClearColor(CLEAR_COLOR))
+    // .insert_resource(bevy_mod_picking::debug::DebugPickingMode::Normal)
     .init_asset::<bevy_vox_scene::VoxelScene>()
     .insert_resource(AMBIENT_LIGHT)
     .add_systems(Startup, (setup// ,add_global_highlight
@@ -1502,8 +1531,8 @@ pub fn main() {
     .add_systems(Update,(
       face_camera,
       proximity_system,
-      spawn_skybox,
-      click_target,
+      // spawn_skybox,
+      // click_target,
       set_visuals,
       visuals,
       ui,
