@@ -1,0 +1,29 @@
+
+
+
+
+
+<!DOCTYPE html><html lang="en"><head>
+<style>
+html, body {
+    margin: 0;
+    height: 100%;
+}
+</style>
+    <meta charset="utf-8">
+    <title>spooky forest</title> <!-- ToDo -->
+    <!-- <link data-trunk rel="copy-dir" href="assets"/> -->
+    <!-- <link data-trunk rel="copy-dir" href="credits"/>
+         <link data-trunk rel="copy-file" href="build/windows/icon.ico"/>
+         <link rel="icon" href="icon.ico"> -->
+    <!-- <link data-trunk rel="inline" href="build/web/styles.css"/> -->
+<link rel="preload" href="/bevyspacegame/target/wasm-bindgen/release/bevyspacegame_bg.wasm" as="fetch" type="application/wasm" crossorigin="">
+<link rel="preload" href="/bevyspacegame/bevyspacegame_bg.wasm" as="fetch" type="application/wasm" crossorigin="">
+<link rel="modulepreload" href="/bevyspacegame/target/wasm-bindgen/release/bevyspacegame.js">
+<link rel="modulepreload" href="/bevyspacespace_game/bevyspacegame.js"></head>
+    <body style="background-color:#333333;">
+            <canvas id="bevy" onclick="document.getElementById('bevy').requestFullscreen()">
+                Javascript and support for canvas is required
+            </canvas>
+<script type="module">import init from '/bevyspacegame/target/wasm-bindgen/release/bevyspacegame.js';init('/bevyspacegame/target/wasm-bindgen/release/bevyspacegame_bg.wasm');</script>
+<script type="module">import init from '/bevyspacegame/bevyspacegame.js';init('/bevyspacegame/bevyspacegame_bg.wasm');</script></body></html>
