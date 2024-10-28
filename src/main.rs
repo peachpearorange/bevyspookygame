@@ -248,33 +248,6 @@ impl Visuals {
            ..self }
   }
 }
-
-// #[derive(Component)]
-// pub struct Billboard {
-//   pub transform: Transform,
-//   pub image_handle: Handle<Image>,
-//   pub unlit: bool
-// }
-// pub fn gib_billboard(mut sprite_3d_params: Sprite3dParams,
-//                      mut c: Commands,
-//                      q: Query<(Entity, &Billboard)>) {
-//   for (e,
-//        Billboard { transform,
-//                    image_handle,
-//                    unlit }) in &q
-//   {
-//     if let Some(image) = sprite_3d_params.images.get(image_handle.clone()) {
-//       c.entity(e)
-//        .remove::<Billboard>()
-//        .insert(bevy_sprite3d::Sprite3d { image: image_handle.clone(),
-//                                          transform: *transform,
-//                                          pixels_per_metre: image.height() as f32,
-//                                          double_sided: true,
-//                                          unlit: false,
-//                                          ..default() }.bundle(&mut sprite_3d_params));
-//     }
-//   }
-// }
 #[derive(Component, Clone)]
 pub struct VisualSprite;
 
@@ -1452,7 +1425,7 @@ pub fn main() {
     .run();
 }
 
-// trunk build --release --public-url "bevyspacegame" --filehash false
+// trunk build --release --public-url "bevyspookygame" --filehash false
 
 // trunk serve
 
