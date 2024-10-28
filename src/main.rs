@@ -1359,13 +1359,13 @@ pub fn main() {
       EmbeddedAssetPlugin::default(),
       // bevy::pbr::ScreenSpaceAmbientOcclusionPlugin
       DefaultPlugins
-      // .set(bevy::render::RenderPlugin {
-      //   render_creation: bevy::render::settings::RenderCreation::Automatic(bevy::render::settings::WgpuSettings {
-      //     backends: Some(bevy::render::settings::Backends::DX12),
-      //     ..default()
-      //   }),
-      //   ..default()
-      // })
+      .set(bevy::render::RenderPlugin {
+        render_creation: bevy::render::settings::RenderCreation::Automatic(bevy::render::settings::WgpuSettings {
+          backends: Some(bevy::render::settings::Backends::DX12),
+          ..default()
+        }),
+        ..default()
+      })
         .set(ImagePlugin{default_sampler})
         .set(WindowPlugin {
           primary_window: Some(Window {
