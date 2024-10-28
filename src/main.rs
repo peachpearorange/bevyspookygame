@@ -1361,7 +1361,7 @@ pub fn main() {
       DefaultPlugins
       .set(bevy::render::RenderPlugin {
         render_creation: bevy::render::settings::RenderCreation::Automatic(bevy::render::settings::WgpuSettings {
-          backends: Some(bevy::render::settings::Backends::VULKAN),
+          backends: Some(bevy::render::settings::Backends::DX12),
           ..default()
         }),
         ..default()
